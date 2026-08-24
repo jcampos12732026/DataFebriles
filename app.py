@@ -4,63 +4,94 @@ import plotly.express as px
 from datetime import datetime
 
 # Configuración de página ancha
-st.set_page_config(page_title="Sala Situacional - Febriles C.S. César López Silva", layout="wide")
+st.set_page_config(
+    page_title="Sala Situacional - Febriles C.S. César López Silva", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Estilos CSS avanzados para encuadre full-width y sidebar angosto
+# Estilos CSS avanzados: Fondo estrellado de homenaje, panel unificado y letrero full-width
 st.markdown("""
     <style>
-    /* Fondo general */
+    /* Fondo con gradiente nocturno y estrellas fijas */
     .stApp {
-        background-color: #0b111e;
+        background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
         color: #ffffff;
     }
-    
-    /* Reducir espacio superior e interno */
+
+    /* Animación de destellos / estrellas en el fondo */
+    @keyframes twinkling {
+        0% { opacity: 0.3; transform: scale(0.8); }
+        50% { opacity: 1; transform: scale(1.2); }
+        100% { opacity: 0.3; transform: scale(0.8); }
+    }
+
+    /* Banner conmemorativo de Homenaje */
+    .homenaje-banner {
+        background: linear-gradient(90deg, rgba(20,30,48,0.8), rgba(36,59,85,0.8));
+        border: 1px solid #ffd700;
+        border-radius: 6px;
+        padding: 6px 15px;
+        text-align: center;
+        color: #ffeb3b;
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 12px;
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+    }
+    .homenaje-banner span {
+        color: #ffffff;
+        font-weight: bold;
+        margin: 0 5px;
+    }
+
+    /* Ajuste del margen superior principal */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 1rem !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
         max-width: 100% !important;
     }
-    
-    /* Controlar el ancho del Sidebar para hacerlo más angosto */
+
+    /* Ancho del sidebar */
     [data-testid="stSidebar"] {
-        width: 260px !important;
-        min-width: 260px !important;
+        width: 270px !important;
+        min-width: 270px !important;
+        background-color: #0d131d !important;
     }
     [data-testid="stSidebar"] > div:first-child {
-        width: 260px !important;
+        width: 270px !important;
     }
 
-    /* Encabezado Institucional Full-Width y texto claro */
+    /* CONTENEDOR UNIFICADO EN EL SIDEBAR (Tarjeta + Filtro en el mismo bloque) */
+    .sidebar-unified-card {
+        background: linear-gradient(145deg, #151c28, #1a2436);
+        border: 2px solid #0056b3;
+        border-radius: 10px;
+        padding: 16px 12px;
+        box-shadow: 0px 4px 15px rgba(0, 86, 179, 0.3);
+        margin-bottom: 15px;
+    }
+
+    /* Encabezado Institucional Full-Width */
     .header-box {
         background-color: #003366;
         width: 100%;
-        padding: 12px 20px;
+        padding: 12px 15px;
         border-radius: 6px;
         color: #ffffff;
         text-align: center;
         font-weight: 700;
         font-size: 16px;
         letter-spacing: 0.5px;
-        margin-bottom: 20px;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
-    }
-
-    /* Tarjeta del Sidebar */
-    .card-semana-sidebar {
-        background-color: #1a2332;
-        border: 2px solid #0056b3;
-        border-radius: 8px;
-        padding: 12px 8px;
-        text-align: center;
         margin-bottom: 15px;
+        box-shadow: 0px 4px 12px rgba(0,0,0,0.4);
     }
 
-    /* Ajuste visual para etiquetas del Multiselect (filtros más compactos) */
+    /* Personalización de los chips de filtro (Años) */
     span[data-baseweb="tag"] {
-        background-color: #e63946 !important;
+        background-color: #d90429 !important;
         border-radius: 4px !important;
         padding: 2px 6px !important;
         font-size: 12px !important;
@@ -104,42 +135,57 @@ def cargar_datos():
 try:
     df = cargar_datos()
 
-    # CÁLCULO DE SEMANA ACTUAL DEL SISTEMA
+    # Cálculo de la Semana Actual del Sistema
     fecha_hoy = datetime.now()
     semana_actual_sistema = fecha_hoy.isocalendar()[1]
     anio_actual_sistema = fecha_hoy.year
 
-    # --- SIDEBAR ANGOSTO (TARJETA + FILTRO) ---
+    # --- SIDEBAR: BLOQUE UNIFICADO (TARJETA + FILTRO) ---
     with st.sidebar:
+        # Inicio del contenedor unificado
         st.markdown(f"""
-        <div class="card-semana-sidebar">
-            <h4 style="margin:0; color:#4da6ff; font-size: 14px;">Semana Epidemiológica Actual</h4>
-            <h1 style="font-size: 40px; margin: 4px 0; color: #ffcc00;">===> {semana_actual_sistema}</h1>
-            <p style="margin:0; color:#cccccc; font-size: 13px;">Año: {anio_actual_sistema}</p>
+        <div class="sidebar-unified-card">
+            <div style="text-align: center; border-bottom: 1px solid #0056b3; padding-bottom: 12px; margin-bottom: 15px;">
+                <h4 style="margin:0; color:#4da6ff; font-size: 14px; text-transform: uppercase;">Semana Epidemiológica Actual</h4>
+                <h1 style="font-size: 42px; margin: 6px 0; color: #ffcc00; font-weight: bold;">===> {semana_actual_sistema}</h1>
+                <p style="margin:0; color:#cccccc; font-size: 13px;">Año: {anio_actual_sistema}</p>
+            </div>
+            <div style="text-align: left;">
+                <p style="margin: 0 0 5px 0; font-weight: bold; color: #ffffff; font-size: 13px;">🔍 Control de Filtros</p>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        st.subheader("🔍 Control de Filtros")
         
         anios_disponibles = sorted(df['año'].unique())
         ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
         
+        # Filtro integrado directamente
         anio_sel = st.multiselect("Seleccionar Año(s):", anios_disponibles, default=ultimos_dos_anios)
 
-    # ENCABEZADO PRINCIPAL COMPLETO
+    # --- ÁREA PRINCIPAL ---
+    
+    # 1. Homenaje Institucional y Conmemorativo
+    st.markdown("""
+    <div class="homenaje-banner">
+        ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
+        <span>Angela Neyra</span> ⭐ <span>Violeta Huacho</span> ⭐ <span>Celia Silva</span> ✨
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 2. Encabezado Oficial Full-Width
     st.markdown('<div class="header-box">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
-    # Filtrado de data
+    # Filtrar dataframe según selección
     df_filtered = df[df['año'].isin(anio_sel)].copy()
     df_filtered['año_str'] = df_filtered['año'].astype(str)
 
-    # DATOS DE COMPARATIVO ULTIMAS SEMANAS
+    # Datos para el comparativo de últimas semanas del último año
     ultimo_anio_csv = max(anios_disponibles)
     df_ultimo_anio = df[df['año'] == ultimo_anio_csv]
     semanas_csv = [int(s) for s in sorted(df_ultimo_anio['semana'].unique())]
     ultimas_2_semanas = semanas_csv[-2:] if len(semanas_csv) >= 2 else semanas_csv
 
-    # FILA 1: GRÁFICOS PRINCIPALES
+    # FILA 1: GRÁFICOS SEMANALES
     col_mid, col_right = st.columns([1.8, 1])
 
     with col_mid:
