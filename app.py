@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from datetime import datetime
 
 # Configuración de página ancha
 st.set_page_config(page_title="Sala Situacional - Febriles C.S. César López Silva", layout="wide")
@@ -29,6 +30,13 @@ st.markdown("""
         padding: 15px;
         text-align: center;
     }
+    .sub-card-info {
+        background-color: #0e1726;
+        border-radius: 5px;
+        padding: 8px;
+        margin-top: 10px;
+        border: 1px dashed #3a506b;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -40,12 +48,10 @@ def cargar_datos():
     if 'ano' in df.columns:
         df = df.rename(columns={'ano': 'año'})
     
-    # Asegurar tipos de datos numéricos limpios
     for col in ['feb_tot', 'tot_aten', 'semana', 'año']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
-    # Forzar 'año' y 'semana' a entero
     df['año'] = df['año'].astype(int)
     df['semana'] = df['semana'].astype(int)
     
@@ -57,44 +63,47 @@ try:
     # Encabezado
     st.markdown('<div class="header-box">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
-    # Sidebar: Filtros de Control
+    # Sidebar: Control de Filtros
     st.sidebar.header("🔍 Control de Filtros")
     
     anios_disponibles = sorted(df['año'].unique())
     ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
     
-    # Filtro de Años (Por defecto selecciona los dos últimos años)
     anio_sel = st.sidebar.multiselect("Seleccionar Año(s):", anios_disponibles, default=ultimos_dos_anios)
     
-    # Filtro de Semanas
     semanas_disponibles = sorted(df['semana'].unique())
     semana_sel = st.sidebar.select_slider("Rango de Semanas Epidemiológicas:", options=semanas_disponibles, value=(min(semanas_disponibles), max(semanas_disponibles)))
 
-    # Filtrar datos globales para los primeros dos gráficos
+    # Data filtrada
     df_filtered = df[(df['año'].isin(anio_sel)) & (df['semana'].between(semana_sel[0], semana_sel[1]))].copy()
-
-    # Convertir 'año' a string para evitar decimales en leyendas/ejes
     df_filtered['año_str'] = df_filtered['año'].astype(str)
 
-    # --- LÓGICA AUTOMÁTICA DE ÚLTIMAS 2 SEMANAS Y ÚLTIMOS 2 AÑOS ---
-    ultimo_anio_data = max(anios_disponibles)
-    penultimo_anio_data = ultimo_anio_data - 1
+    # --- CÁLCULO DE FECHA DEL SISTEMA (SEMANA EPIDEMIOLÓGICA REAL) ---
+    fecha_actual = datetime.now()
+    semana_sistema = fecha_actual.isocalendar()[1]
+    anio_sistema = fecha_actual.year
 
-    # Obtener las dos últimas semanas registradas en el último año activo
-    df_ultimo_anio = df[df['año'] == ultimo_anio_data]
-    semanas_ultimo_anio = sorted(df_ultimo_anio['semana'].unique())
-    ultimas_2_semanas = semanas_ultimo_anio[-2:] if len(semanas_ultimo_anio) >= 2 else semanas_ultimo_anio
+    # --- CÁLCULO DE DATOS DEL CSV ---
+    ultimo_anio_csv = max(anios_disponibles)
+    df_ultimo_anio = df[df['año'] == ultimo_anio_csv]
+    semanas_csv = sorted(df_ultimo_anio['semana'].unique())
+    semana_max_csv = semanas_csv[-1] if len(semanas_csv) > 0 else 0
+    ultimas_2_semanas = semanas_csv[-2:] if len(semanas_csv) >= 2 else semanas_csv
 
     # Layout Principal
     col_left, col_mid, col_right = st.columns([1, 2.5, 2])
 
     with col_left:
-        semana_actual = ultimas_2_semanas[-1] if len(ultimas_2_semanas) > 0 else 0
         st.markdown(f"""
         <div class="card-semana">
-            <h4 style="margin:0; color:#4da6ff;">Semana Epidemiológica Actual</h4>
-            <h1 style="font-size: 56px; margin: 10px 0; color: #ffcc00;">===> {semana_actual}</h1>
-            <p style="margin:0; color:#cccccc;">Año: {ultimo_anio_data}</p>
+            <h4 style="margin:0; color:#4da6ff;">Semana Epidemiológica Actual (Sistema)</h4>
+            <h1 style="font-size: 52px; margin: 5px 0; color: #ffcc00;">===> {semana_sistema}</h1>
+            <p style="margin:0; color:#cccccc;">Año Calendario: {anio_sistema}</p>
+            
+            <div class="sub-card-info">
+                <span style="color: #66b2ff; font-weight: bold;">Última Semana con Registro CSV:</span>
+                <h3 style="margin: 3px 0; color: #00ffcc;">Semana {semana_max_csv} ({ultimo_anio_csv})</h3>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -114,9 +123,9 @@ try:
 
     with col_right:
         st.subheader("📈 Útimas Semanas Comparativo")
-        # Filtrar exactamente las 2 últimas semanas de los 2 últimos años
+        penultimo_anio_csv = ultimo_anio_csv - 1
         df_comp_data = df[
-            (df['año'].isin([penultimo_anio_data, ultimo_anio_data])) & 
+            (df['año'].isin([penultimo_anio_csv, ultimo_anio_csv])) & 
             (df['semana'].isin(ultimas_2_semanas))
         ].copy()
 
@@ -127,7 +136,7 @@ try:
             fig_ult = px.bar(
                 df_comp, x='semana', y='feb_tot', color='año_str', barmode='group',
                 text_auto=True, template="plotly_dark",
-                title=f"Comparativo Semanas {ultimas_2_semanas} ({penultimo_anio_data} vs {ultimo_anio_data})",
+                title=f"Comparativo Semanas {ultimas_2_semanas} ({penultimo_anio_csv} vs {ultimo_anio_csv})",
                 labels={'semana': 'N° de Semana', 'feb_tot': 'Casos', 'año_str': 'Año'}
             )
             fig_ult.update_xaxes(type='category')
@@ -138,8 +147,6 @@ try:
 
     # --- HISTÓRICO AMARRADO A FILTROS ---
     st.subheader("📉 Comparativo Histórico de Febriles")
-    
-    # Filtrar histórico según los años seleccionados en la sidebar
     df_hist_filtered = df[df['año'].isin(anio_sel)].copy()
     df_hist = df_hist_filtered.groupby('año')['feb_tot'].sum().reset_index()
     
