@@ -6,36 +6,37 @@ from datetime import datetime
 # Configuración de página ancha
 st.set_page_config(page_title="Sala Situacional - Febriles C.S. César López Silva", layout="wide")
 
-# Estilos CSS personalizados
+# Estilos CSS personalizados (Elimina espacio sobrante arriba para alinear con la barra lateral)
 st.markdown("""
     <style>
     .stApp {
         background-color: #0b111e;
         color: #ffffff;
     }
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 1rem !important;
+    }
     .header-box {
         background-color: #003366;
-        padding: 12px 20px;
+        padding: 10px 15px;
         border-radius: 6px;
         color: white;
         text-align: center;
         font-weight: bold;
-        font-size: 20px;
+        font-size: 18px;
         margin-bottom: 15px;
     }
     .card-semana {
         background-color: #1a2332;
         border: 2px solid #0056b3;
         border-radius: 8px;
-        padding: 15px;
+        padding: 20px 15px;
         text-align: center;
-    }
-    .sub-card-info {
-        background-color: #0e1726;
-        border-radius: 5px;
-        padding: 8px;
-        margin-top: 10px;
-        border: 1px dashed #3a506b;
+        min-height: 320px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -60,7 +61,7 @@ def cargar_datos():
 try:
     df = cargar_datos()
 
-    # Encabezado
+    # Encabezado Institucional
     st.markdown('<div class="header-box">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
     # Sidebar: Control de Filtros
@@ -74,36 +75,27 @@ try:
     semanas_disponibles = sorted(df['semana'].unique())
     semana_sel = st.sidebar.select_slider("Rango de Semanas Epidemiológicas:", options=semanas_disponibles, value=(min(semanas_disponibles), max(semanas_disponibles)))
 
-    # Data filtrada
+    # Filtrar datos de la data principal
     df_filtered = df[(df['año'].isin(anio_sel)) & (df['semana'].between(semana_sel[0], semana_sel[1]))].copy()
     df_filtered['año_str'] = df_filtered['año'].astype(str)
 
-    # --- CÁLCULO DE FECHA DEL SISTEMA (SEMANA EPIDEMIOLÓGICA REAL) ---
-    fecha_actual = datetime.now()
-    semana_sistema = fecha_actual.isocalendar()[1]
-    anio_sistema = fecha_actual.year
-
-    # --- CÁLCULO DE DATOS DEL CSV ---
+    # CÁLCULOS DE SEMANAS
     ultimo_anio_csv = max(anios_disponibles)
     df_ultimo_anio = df[df['año'] == ultimo_anio_csv]
     semanas_csv = sorted(df_ultimo_anio['semana'].unique())
     semana_max_csv = semanas_csv[-1] if len(semanas_csv) > 0 else 0
     ultimas_2_semanas = semanas_csv[-2:] if len(semanas_csv) >= 2 else semanas_csv
 
-    # Layout Principal
-    col_left, col_mid, col_right = st.columns([1, 2.5, 2])
+    # Layout Principal (Primera Fila)
+    col_left, col_mid, col_right = st.columns([1.2, 2.4, 2])
 
     with col_left:
+        # Tarjeta limpia con la última semana registrada en la data
         st.markdown(f"""
         <div class="card-semana">
-            <h4 style="margin:0; color:#4da6ff;">Semana Epidemiológica Actual (Sistema)</h4>
-            <h1 style="font-size: 52px; margin: 5px 0; color: #ffcc00;">===> {semana_sistema}</h1>
-            <p style="margin:0; color:#cccccc;">Año Calendario: {anio_sistema}</p>
-            
-            <div class="sub-card-info">
-                <span style="color: #66b2ff; font-weight: bold;">Última Semana con Registro CSV:</span>
-                <h3 style="margin: 3px 0; color: #00ffcc;">Semana {semana_max_csv} ({ultimo_anio_csv})</h3>
-            </div>
+            <h4 style="margin:0; color:#4da6ff;">Semana Epidemiológica Actual</h4>
+            <h1 style="font-size: 58px; margin: 10px 0; color: #ffcc00;">===> {semana_max_csv}</h1>
+            <p style="margin:0; color:#cccccc; font-size: 16px;">Año: {ultimo_anio_csv}</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -142,22 +134,6 @@ try:
             fig_ult.update_xaxes(type='category')
             fig_ult.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=320)
             st.plotly_chart(fig_ult, use_container_width=True)
-
-    st.divider()
-
-    # --- HISTÓRICO AMARRADO A FILTROS ---
-    st.subheader("📉 Comparativo Histórico de Febriles")
-    df_hist_filtered = df[df['año'].isin(anio_sel)].copy()
-    df_hist = df_hist_filtered.groupby('año')['feb_tot'].sum().reset_index()
-    
-    fig_hist = px.area(
-        df_hist, x='año', y='feb_tot',
-        title="EVOLUCIÓN ANUAL HISTÓRICA (Años Seleccionados)",
-        markers=True, template="plotly_dark", color_discrete_sequence=['#ff7f0e']
-    )
-    fig_hist.update_xaxes(type='category')
-    fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300)
-    st.plotly_chart(fig_hist, use_container_width=True)
 
 except Exception as e:
     st.error(f"Error al cargar la visualización: {e}")
