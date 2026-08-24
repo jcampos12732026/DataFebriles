@@ -46,28 +46,21 @@ st.markdown("""
     }
 
     [data-testid="stSidebar"] {
-        width: 280px !important;
-        min-width: 280px !important;
+        width: 290px !important;
+        min-width: 290px !important;
         background-color: #0d131d !important;
     }
 
-    /* TARJETA UNIFICADA INTEGRADA (SEMANA + FILTROS) */
     .unified-card-header {
         background: linear-gradient(145deg, #151c28, #1a2436);
         border: 2px solid #0056b3;
-        border-radius: 10px 10px 0px 0px;
-        padding: 12px 10px 8px 10px;
+        border-radius: 10px;
+        padding: 12px 10px;
         text-align: center;
         box-shadow: 0px 4px 12px rgba(0, 86, 179, 0.3);
-    }
-    
-    .unified-card-divider {
-        background-color: #0056b3;
-        height: 2px;
-        margin: 0px;
+        margin-bottom: 15px;
     }
 
-    /* Chips de selección en multiselect */
     span[data-baseweb="tag"] {
         background-color: #d90429 !important;
         border-radius: 4px !important;
@@ -115,35 +108,41 @@ config_plotly = {'displayModeBar': 'hover'}
 try:
     df = cargar_datos()
 
+    # Cálculo dinámico de la última semana disponible en los datos
+    max_anio_data = int(df['año'].max())
+    df_max_anio = df[df['año'] == max_anio_data]
+    max_semana_data = int(df_max_anio[df_max_anio['feb_tot'] > 0]['semana'].max())
+
     fecha_hoy = datetime.now()
     semana_actual_sistema = fecha_hoy.isocalendar()[1]
-    anio_actual_sistema = fecha_hoy.year
 
     orden_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
-    # --- BARRA LATERAL UNIFICADA (UNA SOLA TARJETA CONTINUA) ---
+    # --- BARRA LATERAL UNIFICADA ---
     with st.sidebar:
-        # Encabezado con Tarjeta de Semana Actual
         st.markdown(f"""
         <div class="unified-card-header">
-            <h4 style="margin:0; color:#4da6ff; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Epidemiológica</h4>
-            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">{semana_actual_sistema}</h1>
-            <p style="margin:2px 0 0 0; color:#dddddd; font-size: 13px; font-weight: 600;">Año: {anio_actual_sistema}</p>
+            <h4 style="margin:0; color:#4da6ff; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Registrada Máxima</h4>
+            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">SE {max_semana_data}</h1>
+            <p style="margin:2px 0 0 0; color:#dddddd; font-size: 13px; font-weight: 600;">Año Evaluado: {max_anio_data}</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Filtros dentro del mismo bloque contiguo
-        st.markdown("<h4 style='color:#ffffff; font-size: 14px; margin-top: 15px; font-weight: bold;'>🔍 Panel de Filtros</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color:#ffffff; font-size: 14px; margin-top: 10px; font-weight: bold;'>⚙️ Controles de Filtros</h4>", unsafe_allow_html=True)
         
         anios_disponibles = sorted(df['año'].unique())
         ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
         
-        # Filtro de Años
-        anio_sel = st.multiselect("Filtrar por Año(s):", anios_disponibles, default=ultimos_dos_anios)
+        # FILTRO 1: Seleccionar Año(s)
+        anio_sel = st.multiselect("1. Filtro Anual:", anios_disponibles, default=ultimos_dos_anios)
 
-        # Filtro de Meses
+        # FILTRO 2: Seleccionar Mes(es)
         meses_disponibles = [m for m in orden_meses if m in df['mes_nom'].unique()]
-        mes_sel = st.multiselect("Filtrar por Mes(es):", meses_disponibles, default=[])
+        mes_sel = st.multiselect("2. Filtro Mensual:", meses_disponibles, default=[])
+
+        # FILTRO 3: Corte Epidemiológico por Última Semana del Último Año
+        corte_acumulado = st.checkbox(f"3. Acumulado hasta SE {max_semana_data} ({max_anio_data})", value=True, 
+                                      help=f"Al marcar esta opción, todos los años comparados se mostrarán solo hasta la Semana {max_semana_data} para asegurar un comparativo justo.")
 
     # --- ÁREA PRINCIPAL ---
     
@@ -161,27 +160,33 @@ try:
     else:
         st.markdown('<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
-    # Filtrado de Datos
+    # FILTRADO DE DATOS APLICANDO LOS 3 FILTROS
     df_filtered = df[df['año'].isin(anio_sel)].copy()
+
     if mes_sel:
         df_filtered = df_filtered[df_filtered['mes_nom'].isin(mes_sel)]
+
+    if corte_acumulado:
+        df_filtered = df_filtered[df_filtered['semana'] <= max_semana_data]
+
     df_filtered['año_str'] = df_filtered['año'].astype(str)
 
-    ultimo_anio_csv = max(anios_disponibles)
-    df_ultimo_anio = df[df['año'] == ultimo_anio_csv]
-    semanas_csv = [int(s) for s in sorted(df_ultimo_anio['semana'].unique())]
-    ultimas_2_semanas = semanas_csv[-2:] if len(semanas_csv) >= 2 else semanas_csv
+    # Cálculo comparativo para las últimas semanas registradas
+    semanas_ultimas = [max_semana_data - 1, max_semana_data] if max_semana_data > 1 else [max_semana_data]
 
-    # FILA 1
+    # FILA 1: GRÁFICOS PRINCIPALES
     col_mid, col_right = st.columns([1.8, 1])
 
     with col_mid:
         st.subheader("📊 Episodios Semanales de Febriles")
         if 'feb_tot' in df_filtered.columns and not df_filtered.empty:
             df_sem = df_filtered.groupby(['semana', 'año_str'])['feb_tot'].sum().reset_index()
+            
+            titulo_graf_sem = f"FEBRILES SEMANALES (HASTA SE {max_semana_data})" if corte_acumulado else "FEBRILES SEMANALES (AÑO COMPLETO)"
+            
             fig_sem = px.bar(
                 df_sem, x='semana', y='feb_tot', color='año_str', barmode='group',
-                title="FEBRILES SEMANALES - C.S. CÉSAR LÓPEZ SILVA",
+                title=f"FEBRILES SEMANALES - C.S. CÉSAR LÓPEZ SILVA - {titulo_graf_sem}",
                 labels={'semana': 'N° de Semana', 'feb_tot': 'Casos', 'año_str': 'Año'},
                 template="plotly_dark"
             )
@@ -190,20 +195,20 @@ try:
             st.plotly_chart(fig_sem, use_container_width=True, config=config_plotly)
 
     with col_right:
-        st.subheader("📈 Útimas Semanas Comparativo")
-        penultimo_anio_csv = ultimo_anio_csv - 1
+        st.subheader("📈 Comparativo Últimas Semanas")
+        penultimo_anio_csv = max_anio_data - 1
         
         df_comp_data = df[
-            (df['año'].isin([penultimo_anio_csv, ultimo_anio_csv])) & 
-            (df['semana'].isin(ultimas_2_semanas))
+            (df['año'].isin([penultimo_anio_csv, max_anio_data])) & 
+            (df['semana'].isin(semanas_ultimas))
         ].copy()
 
         df_comp_data['año_str'] = df_comp_data['año'].astype(str)
 
         if not df_comp_data.empty:
             df_comp = df_comp_data.groupby(['semana', 'año_str'])['feb_tot'].sum().reset_index()
-            texto_semanas = " y ".join([str(s) for s in ultimas_2_semanas])
-            titulo_comparativo = f"Comparativo Semanas {texto_semanas} ({penultimo_anio_csv} vs {ultimo_anio_csv})"
+            texto_semanas = " y ".join([str(s) for s in semanas_ultimas])
+            titulo_comparativo = f"Semanas {texto_semanas} ({penultimo_anio_csv} vs {max_anio_data})"
             
             fig_ult = px.bar(
                 df_comp, x='semana', y='feb_tot', color='año_str', barmode='group',
@@ -217,7 +222,7 @@ try:
 
     st.divider()
 
-    # FILA 2
+    # FILA 2: GRÁFICOS SECUNDARIOS
     col_mes, col_hist = st.columns([1.5, 1])
 
     with col_mes:
@@ -240,12 +245,12 @@ try:
             st.plotly_chart(fig_mes, use_container_width=True, config=config_plotly)
 
     with col_hist:
-        st.subheader("📉 Evolución Anual")
+        st.subheader("📉 Evolución Anual Acumulada")
         if not df_filtered.empty:
             df_hist = df_filtered.groupby('año')['feb_tot'].sum().reset_index()
             fig_hist = px.area(
                 df_hist, x='año', y='feb_tot',
-                title="EVOLUCIÓN ANUAL HISTÓRICA",
+                title="EVOLUCIÓN HISTÓRICA ACUMULADA",
                 markers=True, template="plotly_dark", color_discrete_sequence=['#ff7f0e']
             )
             fig_hist.update_xaxes(type='category')
