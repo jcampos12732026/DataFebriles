@@ -64,36 +64,39 @@ try:
     # Encabezado Institucional
     st.markdown('<div class="header-box">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
-    # Sidebar: Único Filtro por Año(s)
+    # Sidebar: Control de Filtros por Año(s)
     st.sidebar.header("🔍 Control de Filtros")
     
     anios_disponibles = sorted(df['año'].unique())
     ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
     
-    # Filtro amarrado a todos los gráficos
     anio_sel = st.sidebar.multiselect("Seleccionar Año(s):", anios_disponibles, default=ultimos_dos_anios)
 
-    # Filtrar el dataframe global según los años elegidos
+    # Filtrar el dataframe según los años elegidos
     df_filtered = df[df['año'].isin(anio_sel)].copy()
     df_filtered['año_str'] = df_filtered['año'].astype(str)
 
-    # Cálculos dinámicos de semanas
+    # --- CÁLCULO DE SEMANA ACTUAL DEL SISTEMA ---
+    fecha_hoy = datetime.now()
+    semana_actual_sistema = fecha_hoy.isocalendar()[1]
+    anio_actual_sistema = fecha_hoy.year
+
+    # --- DATOS DEL CSV PARA EL COMPARATIVO ---
     ultimo_anio_csv = max(anios_disponibles)
     df_ultimo_anio = df[df['año'] == ultimo_anio_csv]
-    semanas_csv = sorted(df_ultimo_anio['semana'].unique())
-    semana_max_csv = semanas_csv[-1] if len(semanas_csv) > 0 else 0
+    semanas_csv = [int(s) for s in sorted(df_ultimo_anio['semana'].unique())]
     ultimas_2_semanas = semanas_csv[-2:] if len(semanas_csv) >= 2 else semanas_csv
 
-    # Layout Superior: Tarjeta + Gráficos Principales
+    # Layout Principal
     col_left, col_mid, col_right = st.columns([1.2, 2.4, 2])
 
     with col_left:
-        # Tarjeta superior izquierda
+        # Tarjeta calculada en función de la fecha real del sistema
         st.markdown(f"""
         <div class="card-semana">
             <h4 style="margin:0; color:#4da6ff;">Semana Epidemiológica Actual</h4>
-            <h1 style="font-size: 58px; margin: 10px 0; color: #ffcc00;">===> {semana_max_csv}</h1>
-            <p style="margin:0; color:#cccccc; font-size: 16px;">Año: {ultimo_anio_csv}</p>
+            <h1 style="font-size: 58px; margin: 10px 0; color: #ffcc00;">===> {semana_actual_sistema}</h1>
+            <p style="margin:0; color:#cccccc; font-size: 16px;">Año: {anio_actual_sistema}</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -114,6 +117,7 @@ try:
     with col_right:
         st.subheader("📈 Útimas Semanas Comparativo")
         penultimo_anio_csv = ultimo_anio_csv - 1
+        
         df_comp_data = df[
             (df['año'].isin([penultimo_anio_csv, ultimo_anio_csv])) & 
             (df['semana'].isin(ultimas_2_semanas))
@@ -123,10 +127,15 @@ try:
 
         if not df_comp_data.empty:
             df_comp = df_comp_data.groupby(['semana', 'año_str'])['feb_tot'].sum().reset_index()
+            
+            # Formateo limpio del título sin tipos de datos internos
+            texto_semanas = " y ".join([str(s) for s in ultimas_2_semanas])
+            titulo_comparativo = f"Comparativo Semanas {texto_semanas} ({penultimo_anio_csv} vs {ultimo_anio_csv})"
+            
             fig_ult = px.bar(
                 df_comp, x='semana', y='feb_tot', color='año_str', barmode='group',
                 text_auto=True, template="plotly_dark",
-                title=f"Comparativo Semanas {ultimas_2_semanas} ({penultimo_anio_csv} vs {ultimo_anio_csv})",
+                title=titulo_comparativo,
                 labels={'semana': 'N° de Semana', 'feb_tot': 'Casos', 'año_str': 'Año'}
             )
             fig_ult.update_xaxes(type='category')
@@ -135,7 +144,7 @@ try:
 
     st.divider()
 
-    # Layout Inferior: Gráfico Histórico enlazado al Filtro de Años
+    # Layout Inferior: Gráfico Histórico amarrado a los filtros
     st.subheader("📉 Comparativo Histórico de Febriles")
     if not df_filtered.empty:
         df_hist = df_filtered.groupby('año')['feb_tot'].sum().reset_index()
