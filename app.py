@@ -6,7 +6,7 @@ from datetime import datetime
 # Configuración de página ancha
 st.set_page_config(page_title="Sala Situacional - Febriles C.S. César López Silva", layout="wide")
 
-# Estilos CSS
+# Estilos CSS personalizados
 st.markdown("""
     <style>
     .stApp {
@@ -49,13 +49,31 @@ def cargar_datos():
     if 'ano' in df.columns:
         df = df.rename(columns={'ano': 'año'})
     
-    for col in ['feb_tot', 'tot_aten', 'semana', 'año']:
+    for col in ['feb_tot', 'tot_aten', 'semana', 'año', 'mes']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
     df['año'] = df['año'].astype(int)
     df['semana'] = df['semana'].astype(int)
     
+    # Mapeo de meses si existen como número
+    meses_nombre = {
+        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+        5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+        9: 'Setiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+    }
+    
+    if 'mes' in df.columns:
+        df['mes_nom'] = df['mes'].map(meses_nombre).fillna('Desconocido')
+    elif 'fecha' in df.columns:
+        df['fecha'] = pd.to_datetime(df['fecha'], errors='coerce')
+        df['mes_num'] = df['fecha'].dt.month
+        df['mes_nom'] = df['mes_num'].map(meses_nombre).fillna('Desconocido')
+    else:
+        # Aproximación de mes según semana epidemiológica si no existe columna mes
+        df['mes_num'] = ((df['semana'] - 1) // 4.33 + 1).astype(int).clip(1, 12)
+        df['mes_nom'] = df['mes_num'].map(meses_nombre)
+
     return df
 
 try:
@@ -72,26 +90,25 @@ try:
     
     anio_sel = st.sidebar.multiselect("Seleccionar Año(s):", anios_disponibles, default=ultimos_dos_anios)
 
-    # Filtrar el dataframe según los años elegidos
+    # Data filtrada según los años elegidos
     df_filtered = df[df['año'].isin(anio_sel)].copy()
     df_filtered['año_str'] = df_filtered['año'].astype(str)
 
-    # --- CÁLCULO DE SEMANA ACTUAL DEL SISTEMA ---
+    # CÁLCULO DE SEMANA ACTUAL DEL SISTEMA
     fecha_hoy = datetime.now()
     semana_actual_sistema = fecha_hoy.isocalendar()[1]
     anio_actual_sistema = fecha_hoy.year
 
-    # --- DATOS DEL CSV PARA EL COMPARATIVO ---
+    # DATOS DEL CSV PARA COMPARATIVO DE ÚLTIMAS SEMANAS
     ultimo_anio_csv = max(anios_disponibles)
     df_ultimo_anio = df[df['año'] == ultimo_anio_csv]
     semanas_csv = [int(s) for s in sorted(df_ultimo_anio['semana'].unique())]
     ultimas_2_semanas = semanas_csv[-2:] if len(semanas_csv) >= 2 else semanas_csv
 
-    # Layout Principal
+    # FILA 1: Tarjeta + Gráficos Semanales
     col_left, col_mid, col_right = st.columns([1.2, 2.4, 2])
 
     with col_left:
-        # Tarjeta calculada en función de la fecha real del sistema
         st.markdown(f"""
         <div class="card-semana">
             <h4 style="margin:0; color:#4da6ff;">Semana Epidemiológica Actual</h4>
@@ -106,7 +123,7 @@ try:
             df_sem = df_filtered.groupby(['semana', 'año_str'])['feb_tot'].sum().reset_index()
             fig_sem = px.bar(
                 df_sem, x='semana', y='feb_tot', color='año_str', barmode='group',
-                title="TOTAL DE EPISODIOS SEMANALES DE FEBRILES",
+                title="TOTAL DE EPISODIOS SEMANALES DE FEBRILES EN EL C.S. CÉSAR LÓPEZ SILVA/RIS CHACLACAYO/DIRIS LIMA ESTE",
                 labels={'semana': 'N° de Semana', 'feb_tot': 'Casos', 'año_str': 'Año'},
                 template="plotly_dark"
             )
@@ -127,8 +144,6 @@ try:
 
         if not df_comp_data.empty:
             df_comp = df_comp_data.groupby(['semana', 'año_str'])['feb_tot'].sum().reset_index()
-            
-            # Formateo limpio del título sin tipos de datos internos
             texto_semanas = " y ".join([str(s) for s in ultimas_2_semanas])
             titulo_comparativo = f"Comparativo Semanas {texto_semanas} ({penultimo_anio_csv} vs {ultimo_anio_csv})"
             
@@ -144,18 +159,41 @@ try:
 
     st.divider()
 
-    # Layout Inferior: Gráfico Histórico amarrado a los filtros
-    st.subheader("📉 Comparativo Histórico de Febriles")
-    if not df_filtered.empty:
-        df_hist = df_filtered.groupby('año')['feb_tot'].sum().reset_index()
-        fig_hist = px.area(
-            df_hist, x='año', y='feb_tot',
-            title="EVOLUCIÓN ANUAL HISTÓRICA (Años Seleccionados)",
-            markers=True, template="plotly_dark", color_discrete_sequence=['#ff7f0e']
-        )
-        fig_hist.update_xaxes(type='category')
-        fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300)
-        st.plotly_chart(fig_hist, use_container_width=True)
+    # FILA 2: Gráficos de Nivel Inferior (Mensualizado e Histórico Anual)
+    col_mes, col_hist = st.columns([1.5, 1])
+
+    with col_mes:
+        st.subheader("📅 Episodios Mensualizados")
+        if not df_filtered.empty:
+            orden_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre']
+            df_mes = df_filtered.groupby(['mes_nom', 'año_str'])['feb_tot'].sum().reset_index()
+            df_mes['mes_nom'] = pd.Categorical(df_mes['mes_nom'], categories=orden_meses, ordered=True)
+            df_mes = df_mes.sort_values('mes_nom')
+
+            anio_inicio = min(anio_sel) if anio_sel else min(anios_disponibles)
+            anio_fin = max(anio_sel) if anio_sel else max(anios_disponibles)
+
+            fig_mes = px.bar(
+                df_mes, x='mes_nom', y='feb_tot', color='año_str', barmode='group',
+                text_auto=True, template="plotly_dark",
+                title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS DESDE EL AÑO {anio_inicio} HASTA EL AÑO {anio_fin}",
+                labels={'mes_nom': 'Mes', 'feb_tot': 'Casos', 'año_str': 'Año'}
+            )
+            fig_mes.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300)
+            st.plotly_chart(fig_mes, use_container_width=True)
+
+    with col_hist:
+        st.subheader("📉 Evolución Anual")
+        if not df_filtered.empty:
+            df_hist = df_filtered.groupby('año')['feb_tot'].sum().reset_index()
+            fig_hist = px.area(
+                df_hist, x='año', y='feb_tot',
+                title="EVOLUCIÓN ANUAL HISTÓRICA",
+                markers=True, template="plotly_dark", color_discrete_sequence=['#ff7f0e']
+            )
+            fig_hist.update_xaxes(type='category')
+            fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300)
+            st.plotly_chart(fig_hist, use_container_width=True)
 
 except Exception as e:
     st.error(f"Error al cargar la visualización: {e}")
