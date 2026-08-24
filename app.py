@@ -6,7 +6,7 @@ from datetime import datetime
 # Configuración de página ancha
 st.set_page_config(page_title="Sala Situacional - Febriles C.S. César López Silva", layout="wide")
 
-# Estilos CSS personalizados
+# Estilos CSS
 st.markdown("""
     <style>
     .stApp {
@@ -27,16 +27,13 @@ st.markdown("""
         font-size: 18px;
         margin-bottom: 15px;
     }
-    .card-semana {
+    .card-semana-sidebar {
         background-color: #1a2332;
         border: 2px solid #0056b3;
         border-radius: 8px;
-        padding: 20px 15px;
+        padding: 15px 10px;
         text-align: center;
-        min-height: 320px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
+        margin-bottom: 20px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -56,7 +53,6 @@ def cargar_datos():
     df['año'] = df['año'].astype(int)
     df['semana'] = df['semana'].astype(int)
     
-    # Mapeo de meses si existen como número
     meses_nombre = {
         1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
         5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
@@ -70,7 +66,6 @@ def cargar_datos():
         df['mes_num'] = df['fecha'].dt.month
         df['mes_nom'] = df['mes_num'].map(meses_nombre).fillna('Desconocido')
     else:
-        # Aproximación de mes según semana epidemiológica si no existe columna mes
         df['mes_num'] = ((df['semana'] - 1) // 4.33 + 1).astype(int).clip(1, 12)
         df['mes_nom'] = df['mes_num'].map(meses_nombre)
 
@@ -79,43 +74,44 @@ def cargar_datos():
 try:
     df = cargar_datos()
 
-    # Encabezado Institucional
-    st.markdown('<div class="header-box">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
-
-    # Sidebar: Control de Filtros por Año(s)
-    st.sidebar.header("🔍 Control de Filtros")
-    
-    anios_disponibles = sorted(df['año'].unique())
-    ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
-    
-    anio_sel = st.sidebar.multiselect("Seleccionar Año(s):", anios_disponibles, default=ultimos_dos_anios)
-
-    # Data filtrada según los años elegidos
-    df_filtered = df[df['año'].isin(anio_sel)].copy()
-    df_filtered['año_str'] = df_filtered['año'].astype(str)
-
     # CÁLCULO DE SEMANA ACTUAL DEL SISTEMA
     fecha_hoy = datetime.now()
     semana_actual_sistema = fecha_hoy.isocalendar()[1]
     anio_actual_sistema = fecha_hoy.year
 
-    # DATOS DEL CSV PARA COMPARATIVO DE ÚLTIMAS SEMANAS
+    # --- SIDEBAR: TARJETA + FILTROS ---
+    with st.sidebar:
+        # 1. Tarjeta posicionada en la parte superior izquierda
+        st.markdown(f"""
+        <div class="card-semana-sidebar">
+            <h4 style="margin:0; color:#4da6ff; font-size: 16px;">Semana Epidemiológica Actual</h4>
+            <h1 style="font-size: 46px; margin: 8px 0; color: #ffcc00;">===> {semana_actual_sistema}</h1>
+            <p style="margin:0; color:#cccccc; font-size: 14px;">Año: {anio_actual_sistema}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.header("🔍 Control de Filtros")
+        
+        anios_disponibles = sorted(df['año'].unique())
+        ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
+        
+        anio_sel = st.multiselect("Seleccionar Año(s):", anios_disponibles, default=ultimos_dos_anios)
+
+    # Encabezado Principal
+    st.markdown('<div class="header-box">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
+
+    # Filtrar dataframe según los años seleccionados
+    df_filtered = df[df['año'].isin(anio_sel)].copy()
+    df_filtered['año_str'] = df_filtered['año'].astype(str)
+
+    # DATOS DEL CSV PARA EL COMPARATIVO
     ultimo_anio_csv = max(anios_disponibles)
     df_ultimo_anio = df[df['año'] == ultimo_anio_csv]
     semanas_csv = [int(s) for s in sorted(df_ultimo_anio['semana'].unique())]
     ultimas_2_semanas = semanas_csv[-2:] if len(semanas_csv) >= 2 else semanas_csv
 
-    # FILA 1: Tarjeta + Gráficos Semanales
-    col_left, col_mid, col_right = st.columns([1.2, 2.4, 2])
-
-    with col_left:
-        st.markdown(f"""
-        <div class="card-semana">
-            <h4 style="margin:0; color:#4da6ff;">Semana Epidemiológica Actual</h4>
-            <h1 style="font-size: 58px; margin: 10px 0; color: #ffcc00;">===> {semana_actual_sistema}</h1>
-            <p style="margin:0; color:#cccccc; font-size: 16px;">Año: {anio_actual_sistema}</p>
-        </div>
-        """, unsafe_allow_html=True)
+    # FILA 1: Gráficos Semanales Principales (Aprovechando el ancho completo)
+    col_mid, col_right = st.columns([1.8, 1])
 
     with col_mid:
         st.subheader("📊 Episodios Semanales de Febriles")
@@ -128,7 +124,7 @@ try:
                 template="plotly_dark"
             )
             fig_sem.update_xaxes(type='category')
-            fig_sem.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=320)
+            fig_sem.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340)
             st.plotly_chart(fig_sem, use_container_width=True)
 
     with col_right:
@@ -154,7 +150,7 @@ try:
                 labels={'semana': 'N° de Semana', 'feb_tot': 'Casos', 'año_str': 'Año'}
             )
             fig_ult.update_xaxes(type='category')
-            fig_ult.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=320)
+            fig_ult.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340)
             st.plotly_chart(fig_ult, use_container_width=True)
 
     st.divider()
