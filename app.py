@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS
+# Estilos CSS unificados y limpios
 st.markdown("""
     <style>
     .stApp {
@@ -46,34 +46,28 @@ st.markdown("""
     }
 
     [data-testid="stSidebar"] {
-        width: 270px !important;
-        min-width: 270px !important;
+        width: 280px !important;
+        min-width: 280px !important;
         background-color: #0d131d !important;
     }
-    [data-testid="stSidebar"] > div:first-child {
-        width: 270px !important;
-    }
 
-    .sidebar-unified-card {
+    /* TARJETA UNIFICADA INTEGRADA (SEMANA + FILTROS) */
+    .unified-card-header {
         background: linear-gradient(145deg, #151c28, #1a2436);
         border: 2px solid #0056b3;
-        border-radius: 8px;
-        padding: 10px 10px;
+        border-radius: 10px 10px 0px 0px;
+        padding: 12px 10px 8px 10px;
+        text-align: center;
         box-shadow: 0px 4px 12px rgba(0, 86, 179, 0.3);
-        margin-bottom: 12px;
-        text-align: center;
+    }
+    
+    .unified-card-divider {
+        background-color: #0056b3;
+        height: 2px;
+        margin: 0px;
     }
 
-    .header-box-logo {
-        background-color: #ffffff;
-        width: 100%;
-        padding: 6px 15px;
-        border-radius: 6px;
-        text-align: center;
-        margin-bottom: 15px;
-        box-shadow: 0px 4px 12px rgba(0,0,0,0.4);
-    }
-
+    /* Chips de selección en multiselect */
     span[data-baseweb="tag"] {
         background-color: #d90429 !important;
         border-radius: 4px !important;
@@ -127,29 +121,33 @@ try:
 
     orden_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
-    # --- SIDEBAR ---
+    # --- BARRA LATERAL UNIFICADA (UNA SOLA TARJETA CONTINUA) ---
     with st.sidebar:
+        # Encabezado con Tarjeta de Semana Actual
         st.markdown(f"""
-        <div class="sidebar-unified-card">
-            <h4 style="margin:0; color:#4da6ff; font-size: 15px; font-weight: bold; text-transform: uppercase;">Semana Epidemiológica Actual</h4>
-            <h1 style="font-size: 54px; margin: 2px 0; color: #ffcc00; font-weight: 900; line-height: 1;">{semana_actual_sistema}</h1>
-            <p style="margin:0; color:#dddddd; font-size: 14px; font-weight: 600;">Año: {anio_actual_sistema}</p>
+        <div class="unified-card-header">
+            <h4 style="margin:0; color:#4da6ff; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Epidemiológica</h4>
+            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">{semana_actual_sistema}</h1>
+            <p style="margin:2px 0 0 0; color:#dddddd; font-size: 13px; font-weight: 600;">Año: {anio_actual_sistema}</p>
         </div>
         """, unsafe_allow_html=True)
         
-        st.subheader("🔍 Control de Filtros")
+        # Filtros dentro del mismo bloque contiguo
+        st.markdown("<h4 style='color:#ffffff; font-size: 14px; margin-top: 15px; font-weight: bold;'>🔍 Panel de Filtros</h4>", unsafe_allow_html=True)
         
         anios_disponibles = sorted(df['año'].unique())
         ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
         
-        anio_sel = st.multiselect("Seleccionar Año(s):", anios_disponibles, default=ultimos_dos_anios)
+        # Filtro de Años
+        anio_sel = st.multiselect("Filtrar por Año(s):", anios_disponibles, default=ultimos_dos_anios)
 
+        # Filtro de Meses
         meses_disponibles = [m for m in orden_meses if m in df['mes_nom'].unique()]
-        mes_sel = st.multiselect("Seleccionar Mes(es):", meses_disponibles, default=[])
+        mes_sel = st.multiselect("Filtrar por Mes(es):", meses_disponibles, default=[])
 
     # --- ÁREA PRINCIPAL ---
     
-    # Banner de Homenaje
+    # Banner Homenaje
     st.markdown("""
     <div class="homenaje-banner">
         ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
@@ -157,13 +155,13 @@ try:
     </div>
     """, unsafe_allow_html=True)
 
-    # Cabecera con Logotipo Oficial
+    # Logotipo Institucional
     if os.path.exists("logo_minsa.png"):
         st.image("logo_minsa.png", use_container_width=True)
     else:
-        st.markdown('<div class="header-box-logo" style="background-color:#003366; color:white; font-weight:bold; padding:10px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
+        st.markdown('<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
-    # Filtrado
+    # Filtrado de Datos
     df_filtered = df[df['año'].isin(anio_sel)].copy()
     if mes_sel:
         df_filtered = df_filtered[df_filtered['mes_nom'].isin(mes_sel)]
