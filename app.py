@@ -10,25 +10,18 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS avanzados: Fondo estrellado de homenaje, panel unificado y letrero full-width
+# Estilos CSS avanzados: Fondo nocturno, tarjeta compacta y filtros integrados
 st.markdown("""
     <style>
-    /* Fondo con gradiente nocturno y estrellas fijas */
+    /* Fondo con gradiente nocturno */
     .stApp {
         background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
         color: #ffffff;
     }
 
-    /* Animación de destellos / estrellas en el fondo */
-    @keyframes twinkling {
-        0% { opacity: 0.3; transform: scale(0.8); }
-        50% { opacity: 1; transform: scale(1.2); }
-        100% { opacity: 0.3; transform: scale(0.8); }
-    }
-
     /* Banner conmemorativo de Homenaje */
     .homenaje-banner {
-        background: linear-gradient(90deg, rgba(20,30,48,0.8), rgba(36,59,85,0.8));
+        background: linear-gradient(90deg, rgba(20,30,48,0.85), rgba(36,59,85,0.85));
         border: 1px solid #ffd700;
         border-radius: 6px;
         padding: 6px 15px;
@@ -45,7 +38,7 @@ st.markdown("""
         margin: 0 5px;
     }
 
-    /* Ajuste del margen superior principal */
+    /* Ajuste del contenedor principal */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 1rem !important;
@@ -54,7 +47,7 @@ st.markdown("""
         max-width: 100% !important;
     }
 
-    /* Ancho del sidebar */
+    /* Ancho de la barra lateral (Sidebar) */
     [data-testid="stSidebar"] {
         width: 270px !important;
         min-width: 270px !important;
@@ -64,21 +57,22 @@ st.markdown("""
         width: 270px !important;
     }
 
-    /* CONTENEDOR UNIFICADO EN EL SIDEBAR (Tarjeta + Filtro en el mismo bloque) */
+    /* CONTENEDOR UNIFICADO COMPACTO */
     .sidebar-unified-card {
         background: linear-gradient(145deg, #151c28, #1a2436);
         border: 2px solid #0056b3;
-        border-radius: 10px;
-        padding: 16px 12px;
-        box-shadow: 0px 4px 15px rgba(0, 86, 179, 0.3);
-        margin-bottom: 15px;
+        border-radius: 8px;
+        padding: 10px 10px;
+        box-shadow: 0px 4px 12px rgba(0, 86, 179, 0.3);
+        margin-bottom: 12px;
+        text-align: center;
     }
 
     /* Encabezado Institucional Full-Width */
     .header-box {
         background-color: #003366;
         width: 100%;
-        padding: 12px 15px;
+        padding: 10px 15px;
         border-radius: 6px;
         color: #ffffff;
         text-align: center;
@@ -89,12 +83,12 @@ st.markdown("""
         box-shadow: 0px 4px 12px rgba(0,0,0,0.4);
     }
 
-    /* Personalización de los chips de filtro (Años) */
+    /* Estilo de los chips de selección */
     span[data-baseweb="tag"] {
         background-color: #d90429 !important;
         border-radius: 4px !important;
-        padding: 2px 6px !important;
-        font-size: 12px !important;
+        padding: 1px 5px !important;
+        font-size: 11px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -132,6 +126,9 @@ def cargar_datos():
 
     return df
 
+# Configuración global para que la barra interactiva Plotly solo aparezca al pasar el cursor (hover)
+config_plotly = {'displayModeBar': 'hover'}
+
 try:
     df = cargar_datos()
 
@@ -140,31 +137,34 @@ try:
     semana_actual_sistema = fecha_hoy.isocalendar()[1]
     anio_actual_sistema = fecha_hoy.year
 
-    # --- SIDEBAR: BLOQUE UNIFICADO (TARJETA + FILTRO) ---
+    # Lista ordenada de meses
+    orden_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+    # --- SIDEBAR: TARJETA MAS PEQUEÑA + LETRAS GRANDES Y FILTROS ---
     with st.sidebar:
-        # Inicio del contenedor unificado
         st.markdown(f"""
         <div class="sidebar-unified-card">
-            <div style="text-align: center; border-bottom: 1px solid #0056b3; padding-bottom: 12px; margin-bottom: 15px;">
-                <h4 style="margin:0; color:#4da6ff; font-size: 14px; text-transform: uppercase;">Semana Epidemiológica Actual</h4>
-                <h1 style="font-size: 42px; margin: 6px 0; color: #ffcc00; font-weight: bold;">===> {semana_actual_sistema}</h1>
-                <p style="margin:0; color:#cccccc; font-size: 13px;">Año: {anio_actual_sistema}</p>
-            </div>
-            <div style="text-align: left;">
-                <p style="margin: 0 0 5px 0; font-weight: bold; color: #ffffff; font-size: 13px;">🔍 Control de Filtros</p>
-            </div>
+            <h4 style="margin:0; color:#4da6ff; font-size: 15px; font-weight: bold; text-transform: uppercase;">Semana Epidemiológica Actual</h4>
+            <h1 style="font-size: 54px; margin: 2px 0; color: #ffcc00; font-weight: 900; line-height: 1;">{semana_actual_sistema}</h1>
+            <p style="margin:0; color:#dddddd; font-size: 14px; font-weight: 600;">Año: {anio_actual_sistema}</p>
         </div>
         """, unsafe_allow_html=True)
+        
+        st.subheader("🔍 Control de Filtros")
         
         anios_disponibles = sorted(df['año'].unique())
         ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
         
-        # Filtro integrado directamente
+        # 1. Filtro de Año(s)
         anio_sel = st.multiselect("Seleccionar Año(s):", anios_disponibles, default=ultimos_dos_anios)
+
+        # 2. Filtro opcional por Mes(es)
+        meses_disponibles = [m for m in orden_meses if m in df['mes_nom'].unique()]
+        mes_sel = st.multiselect("Seleccionar Mes(es):", meses_disponibles, default=[])
 
     # --- ÁREA PRINCIPAL ---
     
-    # 1. Homenaje Institucional y Conmemorativo
+    # Homenaje Institucional
     st.markdown("""
     <div class="homenaje-banner">
         ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
@@ -172,14 +172,16 @@ try:
     </div>
     """, unsafe_allow_html=True)
 
-    # 2. Encabezado Oficial Full-Width
+    # Encabezado Oficial Full-Width
     st.markdown('<div class="header-box">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
-    # Filtrar dataframe según selección
+    # Filtrar dataframe según año(s) y mes(es) seleccionados
     df_filtered = df[df['año'].isin(anio_sel)].copy()
+    if mes_sel:
+        df_filtered = df_filtered[df_filtered['mes_nom'].isin(mes_sel)]
     df_filtered['año_str'] = df_filtered['año'].astype(str)
 
-    # Datos para el comparativo de últimas semanas del último año
+    # Datos para el comparativo de últimas semanas
     ultimo_anio_csv = max(anios_disponibles)
     df_ultimo_anio = df[df['año'] == ultimo_anio_csv]
     semanas_csv = [int(s) for s in sorted(df_ultimo_anio['semana'].unique())]
@@ -200,7 +202,7 @@ try:
             )
             fig_sem.update_xaxes(type='category')
             fig_sem.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=320, margin=dict(l=10, r=10, t=40, b=10))
-            st.plotly_chart(fig_sem, use_container_width=True)
+            st.plotly_chart(fig_sem, use_container_width=True, config=config_plotly)
 
     with col_right:
         st.subheader("📈 Útimas Semanas Comparativo")
@@ -226,7 +228,7 @@ try:
             )
             fig_ult.update_xaxes(type='category')
             fig_ult.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=320, margin=dict(l=10, r=10, t=40, b=10))
-            st.plotly_chart(fig_ult, use_container_width=True)
+            st.plotly_chart(fig_ult, use_container_width=True, config=config_plotly)
 
     st.divider()
 
@@ -236,7 +238,6 @@ try:
     with col_mes:
         st.subheader("📅 Episodios Mensualizados")
         if not df_filtered.empty:
-            orden_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre']
             df_mes = df_filtered.groupby(['mes_nom', 'año_str'])['feb_tot'].sum().reset_index()
             df_mes['mes_nom'] = pd.Categorical(df_mes['mes_nom'], categories=orden_meses, ordered=True)
             df_mes = df_mes.sort_values('mes_nom')
@@ -251,7 +252,7 @@ try:
                 labels={'mes_nom': 'Mes', 'feb_tot': 'Casos', 'año_str': 'Año'}
             )
             fig_mes.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=10, r=10, t=40, b=10))
-            st.plotly_chart(fig_mes, use_container_width=True)
+            st.plotly_chart(fig_mes, use_container_width=True, config=config_plotly)
 
     with col_hist:
         st.subheader("📉 Evolución Anual")
@@ -264,7 +265,7 @@ try:
             )
             fig_hist.update_xaxes(type='category')
             fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=10, r=10, t=40, b=10))
-            st.plotly_chart(fig_hist, use_container_width=True)
+            st.plotly_chart(fig_hist, use_container_width=True, config=config_plotly)
 
 except Exception as e:
     st.error(f"Error al cargar la visualización: {e}")
