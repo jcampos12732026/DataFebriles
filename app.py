@@ -2,24 +2,23 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+import os
 
-# Configuración de página ancha
+# Configuración de página
 st.set_page_config(
     page_title="Sala Situacional - Febriles C.S. César López Silva", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS avanzados: Fondo nocturno, tarjeta compacta y filtros integrados
+# Estilos CSS
 st.markdown("""
     <style>
-    /* Fondo con gradiente nocturno */
     .stApp {
         background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
         color: #ffffff;
     }
 
-    /* Banner conmemorativo de Homenaje */
     .homenaje-banner {
         background: linear-gradient(90deg, rgba(20,30,48,0.85), rgba(36,59,85,0.85));
         border: 1px solid #ffd700;
@@ -38,7 +37,6 @@ st.markdown("""
         margin: 0 5px;
     }
 
-    /* Ajuste del contenedor principal */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 1rem !important;
@@ -47,7 +45,6 @@ st.markdown("""
         max-width: 100% !important;
     }
 
-    /* Ancho de la barra lateral (Sidebar) */
     [data-testid="stSidebar"] {
         width: 270px !important;
         min-width: 270px !important;
@@ -57,7 +54,6 @@ st.markdown("""
         width: 270px !important;
     }
 
-    /* CONTENEDOR UNIFICADO COMPACTO */
     .sidebar-unified-card {
         background: linear-gradient(145deg, #151c28, #1a2436);
         border: 2px solid #0056b3;
@@ -68,22 +64,16 @@ st.markdown("""
         text-align: center;
     }
 
-    /* Encabezado Institucional Full-Width */
-    .header-box {
-        background-color: #003366;
+    .header-box-logo {
+        background-color: #ffffff;
         width: 100%;
-        padding: 10px 15px;
+        padding: 6px 15px;
         border-radius: 6px;
-        color: #ffffff;
         text-align: center;
-        font-weight: 700;
-        font-size: 16px;
-        letter-spacing: 0.5px;
         margin-bottom: 15px;
         box-shadow: 0px 4px 12px rgba(0,0,0,0.4);
     }
 
-    /* Estilo de los chips de selección */
     span[data-baseweb="tag"] {
         background-color: #d90429 !important;
         border-radius: 4px !important;
@@ -126,21 +116,18 @@ def cargar_datos():
 
     return df
 
-# Configuración global para que la barra interactiva Plotly solo aparezca al pasar el cursor (hover)
 config_plotly = {'displayModeBar': 'hover'}
 
 try:
     df = cargar_datos()
 
-    # Cálculo de la Semana Actual del Sistema
     fecha_hoy = datetime.now()
     semana_actual_sistema = fecha_hoy.isocalendar()[1]
     anio_actual_sistema = fecha_hoy.year
 
-    # Lista ordenada de meses
     orden_meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
-    # --- SIDEBAR: TARJETA MAS PEQUEÑA + LETRAS GRANDES Y FILTROS ---
+    # --- SIDEBAR ---
     with st.sidebar:
         st.markdown(f"""
         <div class="sidebar-unified-card">
@@ -155,16 +142,14 @@ try:
         anios_disponibles = sorted(df['año'].unique())
         ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
         
-        # 1. Filtro de Año(s)
         anio_sel = st.multiselect("Seleccionar Año(s):", anios_disponibles, default=ultimos_dos_anios)
 
-        # 2. Filtro opcional por Mes(es)
         meses_disponibles = [m for m in orden_meses if m in df['mes_nom'].unique()]
         mes_sel = st.multiselect("Seleccionar Mes(es):", meses_disponibles, default=[])
 
     # --- ÁREA PRINCIPAL ---
     
-    # Homenaje Institucional
+    # Banner de Homenaje
     st.markdown("""
     <div class="homenaje-banner">
         ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
@@ -172,22 +157,24 @@ try:
     </div>
     """, unsafe_allow_html=True)
 
-    # Encabezado Oficial Full-Width
-    st.markdown('<div class="header-box">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
+    # Cabecera con Logotipo Oficial
+    if os.path.exists("logo_minsa.png"):
+        st.image("logo_minsa.png", use_container_width=True)
+    else:
+        st.markdown('<div class="header-box-logo" style="background-color:#003366; color:white; font-weight:bold; padding:10px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
-    # Filtrar dataframe según año(s) y mes(es) seleccionados
+    # Filtrado
     df_filtered = df[df['año'].isin(anio_sel)].copy()
     if mes_sel:
         df_filtered = df_filtered[df_filtered['mes_nom'].isin(mes_sel)]
     df_filtered['año_str'] = df_filtered['año'].astype(str)
 
-    # Datos para el comparativo de últimas semanas
     ultimo_anio_csv = max(anios_disponibles)
     df_ultimo_anio = df[df['año'] == ultimo_anio_csv]
     semanas_csv = [int(s) for s in sorted(df_ultimo_anio['semana'].unique())]
     ultimas_2_semanas = semanas_csv[-2:] if len(semanas_csv) >= 2 else semanas_csv
 
-    # FILA 1: GRÁFICOS SEMANALES
+    # FILA 1
     col_mid, col_right = st.columns([1.8, 1])
 
     with col_mid:
@@ -196,7 +183,7 @@ try:
             df_sem = df_filtered.groupby(['semana', 'año_str'])['feb_tot'].sum().reset_index()
             fig_sem = px.bar(
                 df_sem, x='semana', y='feb_tot', color='año_str', barmode='group',
-                title="TOTAL DE EPISODIOS SEMANALES DE FEBRILES EN EL C.S. CÉSAR LÓPEZ SILVA/RIS CHACLACAYO/DIRIS LIMA ESTE",
+                title="FEBRILES SEMANALES - C.S. CÉSAR LÓPEZ SILVA",
                 labels={'semana': 'N° de Semana', 'feb_tot': 'Casos', 'año_str': 'Año'},
                 template="plotly_dark"
             )
@@ -232,7 +219,7 @@ try:
 
     st.divider()
 
-    # FILA 2: GRÁFICOS SECUNDARIOS
+    # FILA 2
     col_mes, col_hist = st.columns([1.5, 1])
 
     with col_mes:
@@ -248,7 +235,7 @@ try:
             fig_mes = px.bar(
                 df_mes, x='mes_nom', y='feb_tot', color='año_str', barmode='group',
                 text_auto=True, template="plotly_dark",
-                title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS DESDE EL AÑO {anio_inicio} HASTA EL AÑO {anio_fin}",
+                title=f"COMPARATIVO MENSUAL ({anio_inicio} - {anio_fin})",
                 labels={'mes_nom': 'Mes', 'feb_tot': 'Casos', 'año_str': 'Año'}
             )
             fig_mes.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=10, r=10, t=40, b=10))
