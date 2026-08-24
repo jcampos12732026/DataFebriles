@@ -6,34 +6,64 @@ from datetime import datetime
 # Configuración de página ancha
 st.set_page_config(page_title="Sala Situacional - Febriles C.S. César López Silva", layout="wide")
 
-# Estilos CSS
+# Estilos CSS avanzados para encuadre full-width y sidebar angosto
 st.markdown("""
     <style>
+    /* Fondo general */
     .stApp {
         background-color: #0b111e;
         color: #ffffff;
     }
+    
+    /* Reducir espacio superior e interno */
     .block-container {
-        padding-top: 1.5rem !important;
+        padding-top: 1rem !important;
         padding-bottom: 1rem !important;
+        padding-left: 1.5rem !important;
+        padding-right: 1.5rem !important;
+        max-width: 100% !important;
     }
+    
+    /* Controlar el ancho del Sidebar para hacerlo más angosto */
+    [data-testid="stSidebar"] {
+        width: 260px !important;
+        min-width: 260px !important;
+    }
+    [data-testid="stSidebar"] > div:first-child {
+        width: 260px !important;
+    }
+
+    /* Encabezado Institucional Full-Width y texto claro */
     .header-box {
         background-color: #003366;
-        padding: 10px 15px;
+        width: 100%;
+        padding: 12px 20px;
         border-radius: 6px;
-        color: white;
+        color: #ffffff;
         text-align: center;
-        font-weight: bold;
-        font-size: 18px;
-        margin-bottom: 15px;
+        font-weight: 700;
+        font-size: 16px;
+        letter-spacing: 0.5px;
+        margin-bottom: 20px;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
     }
+
+    /* Tarjeta del Sidebar */
     .card-semana-sidebar {
         background-color: #1a2332;
         border: 2px solid #0056b3;
         border-radius: 8px;
-        padding: 15px 10px;
+        padding: 12px 8px;
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
+    }
+
+    /* Ajuste visual para etiquetas del Multiselect (filtros más compactos) */
+    span[data-baseweb="tag"] {
+        background-color: #e63946 !important;
+        border-radius: 4px !important;
+        padding: 2px 6px !important;
+        font-size: 12px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -79,38 +109,37 @@ try:
     semana_actual_sistema = fecha_hoy.isocalendar()[1]
     anio_actual_sistema = fecha_hoy.year
 
-    # --- SIDEBAR: TARJETA + FILTROS ---
+    # --- SIDEBAR ANGOSTO (TARJETA + FILTRO) ---
     with st.sidebar:
-        # 1. Tarjeta posicionada en la parte superior izquierda
         st.markdown(f"""
         <div class="card-semana-sidebar">
-            <h4 style="margin:0; color:#4da6ff; font-size: 16px;">Semana Epidemiológica Actual</h4>
-            <h1 style="font-size: 46px; margin: 8px 0; color: #ffcc00;">===> {semana_actual_sistema}</h1>
-            <p style="margin:0; color:#cccccc; font-size: 14px;">Año: {anio_actual_sistema}</p>
+            <h4 style="margin:0; color:#4da6ff; font-size: 14px;">Semana Epidemiológica Actual</h4>
+            <h1 style="font-size: 40px; margin: 4px 0; color: #ffcc00;">===> {semana_actual_sistema}</h1>
+            <p style="margin:0; color:#cccccc; font-size: 13px;">Año: {anio_actual_sistema}</p>
         </div>
         """, unsafe_allow_html=True)
         
-        st.header("🔍 Control de Filtros")
+        st.subheader("🔍 Control de Filtros")
         
         anios_disponibles = sorted(df['año'].unique())
         ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
         
         anio_sel = st.multiselect("Seleccionar Año(s):", anios_disponibles, default=ultimos_dos_anios)
 
-    # Encabezado Principal
+    # ENCABEZADO PRINCIPAL COMPLETO
     st.markdown('<div class="header-box">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
-    # Filtrar dataframe según los años seleccionados
+    # Filtrado de data
     df_filtered = df[df['año'].isin(anio_sel)].copy()
     df_filtered['año_str'] = df_filtered['año'].astype(str)
 
-    # DATOS DEL CSV PARA EL COMPARATIVO
+    # DATOS DE COMPARATIVO ULTIMAS SEMANAS
     ultimo_anio_csv = max(anios_disponibles)
     df_ultimo_anio = df[df['año'] == ultimo_anio_csv]
     semanas_csv = [int(s) for s in sorted(df_ultimo_anio['semana'].unique())]
     ultimas_2_semanas = semanas_csv[-2:] if len(semanas_csv) >= 2 else semanas_csv
 
-    # FILA 1: Gráficos Semanales Principales (Aprovechando el ancho completo)
+    # FILA 1: GRÁFICOS PRINCIPALES
     col_mid, col_right = st.columns([1.8, 1])
 
     with col_mid:
@@ -124,7 +153,7 @@ try:
                 template="plotly_dark"
             )
             fig_sem.update_xaxes(type='category')
-            fig_sem.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340)
+            fig_sem.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=320, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_sem, use_container_width=True)
 
     with col_right:
@@ -150,12 +179,12 @@ try:
                 labels={'semana': 'N° de Semana', 'feb_tot': 'Casos', 'año_str': 'Año'}
             )
             fig_ult.update_xaxes(type='category')
-            fig_ult.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340)
+            fig_ult.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=320, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_ult, use_container_width=True)
 
     st.divider()
 
-    # FILA 2: Gráficos de Nivel Inferior (Mensualizado e Histórico Anual)
+    # FILA 2: GRÁFICOS SECUNDARIOS
     col_mes, col_hist = st.columns([1.5, 1])
 
     with col_mes:
@@ -175,7 +204,7 @@ try:
                 title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS DESDE EL AÑO {anio_inicio} HASTA EL AÑO {anio_fin}",
                 labels={'mes_nom': 'Mes', 'feb_tot': 'Casos', 'año_str': 'Año'}
             )
-            fig_mes.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300)
+            fig_mes.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_mes, use_container_width=True)
 
     with col_hist:
@@ -188,7 +217,7 @@ try:
                 markers=True, template="plotly_dark", color_discrete_sequence=['#ff7f0e']
             )
             fig_hist.update_xaxes(type='category')
-            fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300)
+            fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_hist, use_container_width=True)
 
 except Exception as e:
