@@ -234,7 +234,7 @@ try:
             fig_mes = px.bar(
                 df_mes, x='mes_nom', y='feb_tot',
                 text='feb_tot', template="plotly_dark",
-                title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS {rango_str} DEL CENTRO DE SALUD CÉSAR LÓPEZ SILVA/RIS CHACLACAYO/DIRIS LIMA ESTE",
+                title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS {rango_str}",
                 labels={'mes_nom': 'Mes', 'feb_tot': 'Casos'}
             )
             fig_mes.update_traces(textfont_size=13, textposition='auto')
