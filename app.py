@@ -12,56 +12,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS unificados con marcas de agua brillantes de fondo
+# Estilos CSS unificados
 st.markdown("""
     <style>
     .stApp {
         background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
         color: #ffffff;
-        position: relative;
     }
 
-    /* Marcas de agua brillantes de fondo en posiciones fijas */
-    .watermark-celia {
-        position: fixed;
-        top: 15%;
-        left: 5%;
-        font-size: 5vw;
-        font-weight: 900;
-        color: rgba(255, 255, 255, 0.03);
-        text-shadow: 0 0 15px rgba(255, 235, 59, 0.15);
-        z-index: 0;
-        pointer-events: none;
-        user-select: none;
-        font-family: sans-serif;
+    .homenaje-banner {
+        background: linear-gradient(90deg, rgba(20,30,48,0.85), rgba(36,59,85,0.85));
+        border: 1px solid rgba(255, 215, 0, 0.6);
+        border-radius: 8px;
+        padding: 8px 15px;
+        text-align: center;
+        color: #ffeb3b;
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 15px;
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.35), inset 0 0 10px rgba(255, 255, 255, 0.1);
+        text-shadow: 0 0 8px rgba(255, 235, 59, 0.5);
     }
-
-    .watermark-angela {
-        position: fixed;
-        top: 50%;
-        right: 8%;
-        font-size: 5vw;
-        font-weight: 900;
-        color: rgba(255, 255, 255, 0.03);
-        text-shadow: 0 0 15px rgba(255, 235, 59, 0.15);
-        z-index: 0;
-        pointer-events: none;
-        user-select: none;
-        font-family: sans-serif;
-    }
-
-    .watermark-violeta {
-        position: fixed;
-        bottom: 10%;
-        left: 20%;
-        font-size: 5vw;
-        font-weight: 900;
-        color: rgba(255, 255, 255, 0.03);
-        text-shadow: 0 0 15px rgba(255, 235, 59, 0.15);
-        z-index: 0;
-        pointer-events: none;
-        user-select: none;
-        font-family: sans-serif;
+    .homenaje-banner span {
+        color: #ffffff;
+        font-weight: bold;
+        margin: 0 5px;
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
     }
 
     .block-container {
@@ -70,15 +46,12 @@ st.markdown("""
         padding-left: 1rem !important;
         padding-right: 1rem !important;
         max-width: 100% !important;
-        position: relative;
-        z-index: 1;
     }
 
     [data-testid="stSidebar"] {
         width: 290px !important;
         min-width: 290px !important;
         background-color: #0d131d !important;
-        z-index: 2;
     }
 
     .unified-card-header {
@@ -99,11 +72,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-# Elementos de marca de agua brillantes en el fondo
-st.markdown('<div class="watermark-celia">Dra. Celia Silva ✨</div>', unsafe_allow_html=True)
-st.markdown('<div class="watermark-angela">Angela Neyra ✨</div>', unsafe_allow_html=True)
-st.markdown('<div class="watermark-violeta">Violeta Huacho ✨</div>', unsafe_allow_html=True)
 
 @st.cache_data
 def cargar_datos():
@@ -171,15 +139,23 @@ try:
         st.info("Módulos independientes operativos.")
 
     # --- ÁREA PRINCIPAL ---
+    
+    st.markdown("""
+    <div class="homenaje-banner">
+        ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
+        <span>Angela Neyra</span> ⭐ <span>Violeta Huacho</span> ⭐ <span>Celia Silva</span> ✨
+    </div>
+    """, unsafe_allow_html=True)
+
     if os.path.exists("logo_minsa.png"):
         st.image("logo_minsa.png", use_container_width=True)
     else:
         st.markdown('<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
     # ==========================================
-    # FILA 1: Gráfico Semanal (Ancho) y Gráfico Mensualizado
+    # FILA 1: Episodios Semanales y Episodios Mensualizados
     # ==========================================
-    col_mid, col_mes = st.columns([1.6, 1])
+    col_mid, col_mes = st.columns([1.8, 1])
 
     # --- GRÁFICO 1: Episodios Semanales ---
     with col_mid:
@@ -236,7 +212,7 @@ try:
             )
             st.plotly_chart(fig_sem, use_container_width=True, config=config_plotly)
 
-    # --- GRÁFICO 2: Episodios Mensualizados ---
+    # --- GRÁFICO 3: Episodios Mensualizados (Multiselección) ---
     with col_mes:
         st.subheader("📅 Episodios Mensualizados")
         
@@ -258,7 +234,7 @@ try:
             fig_mes = px.bar(
                 df_mes, x='mes_nom', y='feb_tot',
                 text='feb_tot', template="plotly_dark",
-                title=f"COMPARATIVO MENSUALIZADO {rango_str}",
+                title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS {rango_str} DEL CENTRO DE SALUD CÉSAR LÓPEZ SILVA/RIS CHACLACAYO/DIRIS LIMA ESTE",
                 labels={'mes_nom': 'Mes', 'feb_tot': 'Casos'}
             )
             fig_mes.update_traces(textfont_size=13, textposition='auto')
@@ -268,10 +244,11 @@ try:
     st.divider()
 
     # ==========================================
-    # FILA 2: Evolución Anual (Largo y Suavizado) flanqueado por Comparativo Últimas Semanas (Estrecho)
+    # FILA 2: Evolución Anual (Largo) y Comparativo Últimas Semanas (Estrecho)
     # ==========================================
-    col_hist, col_right = st.columns([1.6, 1])
+    col_hist, col_right = st.columns([1.8, 1])
 
+    # --- GRÁFICO 4: Evolución Anual Acumulada (Largo con línea suavizada tipo spline) ---
     with col_hist:
         st.subheader("📉 Evolución Anual Acumulada")
         
@@ -281,27 +258,27 @@ try:
         if not df_hist_base.empty:
             df_hist = df_hist_base.groupby('año')['feb_tot'].sum().reset_index().sort_values('año')
             
-            # Usando go.Figure con línea suavizada (spline) para el gráfico anual
             fig_hist = go.Figure()
             fig_hist.add_trace(go.Scatter(
                 x=df_hist['año'], y=df_hist['feb_tot'],
                 mode='lines+markers+text',
                 text=df_hist['feb_tot'], textposition="top center",
-                textfont=dict(size=12, color='white'),
+                textfont=dict(size=12, color='#ffffff'),
                 line=dict(shape='spline', smoothing=1.3, width=3, color='#ff7f0e'),
-                marker=dict(size=6, color='#ff7f0e'),
+                marker=dict(size=7, color='#ff7f0e'),
                 fill='tozeroy',
-                fillcolor='rgba(255, 127, 14, 0.2)'
+                fillcolor='rgba(255, 127, 14, 0.3)'
             ))
             
             fig_hist.update_layout(
                 title="COMPARATIVO DE FEBRILES (ANUAL)",
-                xaxis_title="Año", yaxis_title="Casos",
+                xaxis_title="Año", yaxis_title="feb_tot",
                 template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                 height=340, margin=dict(l=10, r=10, t=40, b=10), xaxis=dict(type='category')
             )
             st.plotly_chart(fig_hist, use_container_width=True, config=config_plotly)
 
+    # --- GRÁFICO 2: Comparativo Últimas Semanas (Estrecho a la derecha) ---
     with col_right:
         st.subheader("📈 Comparativo Últimas Semanas")
         
