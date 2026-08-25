@@ -110,10 +110,10 @@ config_plotly = {'displayModeBar': 'hover'}
 try:
     df = cargar_datos()
 
+    # Cálculo automático original de la semana máxima del sistema según los datos
     max_anio_data = int(df['año'].max())
-    
-    # Semana epidemiológica fijada estricta en 34 a petición del usuario
-    max_semana_data = 34
+    df_max_anio = df[df['año'] == max_anio_data]
+    max_semana_data = int(df_max_anio[df_max_anio['feb_tot'] > 0]['semana'].max())
 
     anios_disponibles = sorted(df['año'].unique())
     ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
@@ -156,7 +156,7 @@ try:
     with col_mid:
         st.subheader("📊 Episodios Semanales de Febriles")
         
-        # Controles exclusivos para el Gráfico Semanal en la parte superior
+        # Controles exclusivos movidos arriba solo para este gráfico
         col_f1, col_f2 = st.columns([1.5, 1])
         with col_f1:
             anios_g1 = st.multiselect("Seleccionar Año(s) - Semanal:", anios_disponibles, default=ultimos_dos_anios, key="g1_anios")
@@ -207,7 +207,7 @@ try:
         st.subheader("📈 Comparativo Últimas Semanas")
         st.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True)
         
-        # Sincronizado exclusivamente con las últimas semanas de la SE 34 fija
+        # Lógica original restaurada para el comparativo de últimas semanas con la data real
         semanas_ultimas = [max_semana_data - 1, max_semana_data] if max_semana_data >= 2 else [max_semana_data]
         df_comp_data = df[(df['año'].isin(anios_g1)) & (df['semana'].isin(semanas_ultimas))].copy()
         df_comp_data['año_str'] = df_comp_data['año'].astype(str)
@@ -227,7 +227,7 @@ try:
     st.divider()
 
     # ==========================================
-    # FILA 2: Gráfico Mensualizado y Evolución Anual (Independientes del check semanal)
+    # FILA 2: Gráfico Mensualizado y Evolución Anual
     # ==========================================
     col_mes, col_hist = st.columns([1.5, 1])
 
