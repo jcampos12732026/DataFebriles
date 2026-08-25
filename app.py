@@ -12,32 +12,56 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS unificados
+# Estilos CSS unificados con marcas de agua brillantes de fondo
 st.markdown("""
     <style>
     .stApp {
         background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
         color: #ffffff;
+        position: relative;
     }
 
-    .homenaje-banner {
-        background: linear-gradient(90deg, rgba(20,30,48,0.85), rgba(36,59,85,0.85));
-        border: 1px solid rgba(255, 215, 0, 0.6);
-        border-radius: 8px;
-        padding: 8px 15px;
-        text-align: center;
-        color: #ffeb3b;
-        font-size: 13px;
-        font-weight: 500;
-        margin-bottom: 15px;
-        box-shadow: 0 0 15px rgba(255, 215, 0, 0.35), inset 0 0 10px rgba(255, 255, 255, 0.1);
-        text-shadow: 0 0 8px rgba(255, 235, 59, 0.5);
+    /* Marcas de agua brillantes de fondo en posiciones fijas */
+    .watermark-celia {
+        position: fixed;
+        top: 15%;
+        left: 5%;
+        font-size: 5vw;
+        font-weight: 900;
+        color: rgba(255, 255, 255, 0.03);
+        text-shadow: 0 0 15px rgba(255, 235, 59, 0.15);
+        z-index: 0;
+        pointer-events: none;
+        user-select: none;
+        font-family: sans-serif;
     }
-    .homenaje-banner span {
-        color: #ffffff;
-        font-weight: bold;
-        margin: 0 5px;
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+
+    .watermark-angela {
+        position: fixed;
+        top: 50%;
+        right: 8%;
+        font-size: 5vw;
+        font-weight: 900;
+        color: rgba(255, 255, 255, 0.03);
+        text-shadow: 0 0 15px rgba(255, 235, 59, 0.15);
+        z-index: 0;
+        pointer-events: none;
+        user-select: none;
+        font-family: sans-serif;
+    }
+
+    .watermark-violeta {
+        position: fixed;
+        bottom: 10%;
+        left: 20%;
+        font-size: 5vw;
+        font-weight: 900;
+        color: rgba(255, 255, 255, 0.03);
+        text-shadow: 0 0 15px rgba(255, 235, 59, 0.15);
+        z-index: 0;
+        pointer-events: none;
+        user-select: none;
+        font-family: sans-serif;
     }
 
     .block-container {
@@ -46,12 +70,15 @@ st.markdown("""
         padding-left: 1rem !important;
         padding-right: 1rem !important;
         max-width: 100% !important;
+        position: relative;
+        z-index: 1;
     }
 
     [data-testid="stSidebar"] {
         width: 290px !important;
         min-width: 290px !important;
         background-color: #0d131d !important;
+        z-index: 2;
     }
 
     .unified-card-header {
@@ -72,6 +99,11 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+# Elementos de marca de agua brillantes en el fondo
+st.markdown('<div class="watermark-celia">Dra. Celia Silva ✨</div>', unsafe_allow_html=True)
+st.markdown('<div class="watermark-angela">Angela Neyra ✨</div>', unsafe_allow_html=True)
+st.markdown('<div class="watermark-violeta">Violeta Huacho ✨</div>', unsafe_allow_html=True)
 
 @st.cache_data
 def cargar_datos():
@@ -139,23 +171,15 @@ try:
         st.info("Módulos independientes operativos.")
 
     # --- ÁREA PRINCIPAL ---
-    
-    st.markdown("""
-    <div class="homenaje-banner">
-        ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
-        <span>Angela Neyra</span> ⭐ <span>Violeta Huacho</span> ⭐ <span>Celia Silva</span> ✨
-    </div>
-    """, unsafe_allow_html=True)
-
     if os.path.exists("logo_minsa.png"):
         st.image("logo_minsa.png", use_container_width=True)
     else:
-        st.markdown('<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px;">Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
+        st.markdown('<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
     # ==========================================
-    # FILA 1: Gráfico Semanal y Comparativo de Últimas Semanas
+    # FILA 1: Gráfico Semanal (Ancho) y Gráfico Mensualizado
     # ==========================================
-    col_mid, col_right = st.columns([1.8, 1])
+    col_mid, col_mes = st.columns([1.6, 1])
 
     # --- GRÁFICO 1: Episodios Semanales ---
     with col_mid:
@@ -212,7 +236,72 @@ try:
             )
             st.plotly_chart(fig_sem, use_container_width=True, config=config_plotly)
 
-    # --- GRÁFICO 2: Comparativo Últimas Semanas ---
+    # --- GRÁFICO 2: Episodios Mensualizados ---
+    with col_mes:
+        st.subheader("📅 Episodios Mensualizados")
+        
+        anios_mes_sel = st.multiselect("Año(s) - Mensual:", anios_disponibles, default=ultimos_dos_anios, key="g3_anios_multiselect")
+        df_mes_base = df[df['año'].isin(anios_mes_sel)].copy()
+
+        if not df_mes_base.empty:
+            df_mes = df_mes_base.groupby('mes_nom')['feb_tot'].sum().reset_index()
+            df_mes['mes_nom'] = pd.Categorical(df_mes['mes_nom'], categories=orden_meses, ordered=True)
+            df_mes = df_mes.sort_values('mes_nom')
+
+            if anios_mes_sel:
+                min_sel = min(anios_mes_sel)
+                max_sel = max(anios_mes_sel)
+                rango_str = f"DESDE EL AÑO {min_sel} HASTA EL AÑO {max_sel}" if len(anios_mes_sel) > 1 else f"AÑO {min_sel}"
+            else:
+                rango_str = "SELECCIONADOS"
+
+            fig_mes = px.bar(
+                df_mes, x='mes_nom', y='feb_tot',
+                text='feb_tot', template="plotly_dark",
+                title=f"COMPARATIVO MENSUALIZADO {rango_str}",
+                labels={'mes_nom': 'Mes', 'feb_tot': 'Casos'}
+            )
+            fig_mes.update_traces(textfont_size=13, textposition='auto')
+            fig_mes.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340, margin=dict(l=10, r=10, t=40, b=10))
+            st.plotly_chart(fig_mes, use_container_width=True, config=config_plotly)
+
+    st.divider()
+
+    # ==========================================
+    # FILA 2: Evolución Anual (Largo y Suavizado) flanqueado por Comparativo Últimas Semanas (Estrecho)
+    # ==========================================
+    col_hist, col_right = st.columns([1.6, 1])
+
+    with col_hist:
+        st.subheader("📉 Evolución Anual Acumulada")
+        
+        anios_hist = st.multiselect("Seleccionar Año(s) - Anual:", anios_disponibles, default=anios_disponibles, key="g4_anios")
+        df_hist_base = df[df['año'].isin(anios_hist)].copy()
+        
+        if not df_hist_base.empty:
+            df_hist = df_hist_base.groupby('año')['feb_tot'].sum().reset_index().sort_values('año')
+            
+            # Usando go.Figure con línea suavizada (spline) para el gráfico anual
+            fig_hist = go.Figure()
+            fig_hist.add_trace(go.Scatter(
+                x=df_hist['año'], y=df_hist['feb_tot'],
+                mode='lines+markers+text',
+                text=df_hist['feb_tot'], textposition="top center",
+                textfont=dict(size=12, color='white'),
+                line=dict(shape='spline', smoothing=1.3, width=3, color='#ff7f0e'),
+                marker=dict(size=6, color='#ff7f0e'),
+                fill='tozeroy',
+                fillcolor='rgba(255, 127, 14, 0.2)'
+            ))
+            
+            fig_hist.update_layout(
+                title="COMPARATIVO DE FEBRILES (ANUAL)",
+                xaxis_title="Año", yaxis_title="Casos",
+                template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                height=340, margin=dict(l=10, r=10, t=40, b=10), xaxis=dict(type='category')
+            )
+            st.plotly_chart(fig_hist, use_container_width=True, config=config_plotly)
+
     with col_right:
         st.subheader("📈 Comparativo Últimas Semanas")
         
@@ -241,60 +330,6 @@ try:
             fig_ult.update_xaxes(type='category')
             fig_ult.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_ult, use_container_width=True, config=config_plotly)
-
-    st.divider()
-
-    # ==========================================
-    # FILA 2: Gráfico Mensualizado (Multiselección de Años) y Evolución Anual
-    # ==========================================
-    col_mes, col_hist = st.columns([1.5, 1])
-
-    with col_mes:
-        st.subheader("📅 Episodios Mensualizados")
-        
-        # Multiselect para años en el gráfico mensualizado
-        anios_mes_sel = st.multiselect("Año(s) - Mensual:", anios_disponibles, default=ultimos_dos_anios, key="g3_anios_multiselect")
-        df_mes_base = df[df['año'].isin(anios_mes_sel)].copy()
-
-        if not df_mes_base.empty:
-            df_mes = df_mes_base.groupby('mes_nom')['feb_tot'].sum().reset_index()
-            df_mes['mes_nom'] = pd.Categorical(df_mes['mes_nom'], categories=orden_meses, ordered=True)
-            df_mes = df_mes.sort_values('mes_nom')
-
-            # Rango dinámico de años para el título del gráfico
-            if anios_mes_sel:
-                min_sel = min(anios_mes_sel)
-                max_sel = max(anios_mes_sel)
-                rango_str = f"DESDE EL AÑO {min_sel} HASTA EL AÑO {max_sel}" if len(anios_mes_sel) > 1 else f"AÑO {min_sel}"
-            else:
-                rango_str = "SELECCIONADOS"
-
-            fig_mes = px.bar(
-                df_mes, x='mes_nom', y='feb_tot',
-                text='feb_tot', template="plotly_dark",
-                title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS {rango_str}",
-                labels={'mes_nom': 'Mes', 'feb_tot': 'Casos'}
-            )
-            fig_mes.update_traces(textfont_size=13, textposition='auto')
-            fig_mes.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340, margin=dict(l=10, r=10, t=40, b=10))
-            st.plotly_chart(fig_mes, use_container_width=True, config=config_plotly)
-
-    with col_hist:
-        st.subheader("📉 Evolución Anual Acumulada")
-        
-        anios_hist = st.multiselect("Seleccionar Año(s) - Anual:", anios_disponibles, default=anios_disponibles, key="g4_anios")
-        df_hist_base = df[df['año'].isin(anios_hist)].copy()
-        
-        if not df_hist_base.empty:
-            df_hist = df_hist_base.groupby('año')['feb_tot'].sum().reset_index()
-            fig_hist = px.area(
-                df_hist, x='año', y='feb_tot',
-                title="COMPARATIVO DE FEBRILES (ANUAL)",
-                markers=True, template="plotly_dark", color_discrete_sequence=['#ff7f0e']
-            )
-            fig_hist.update_xaxes(type='category')
-            fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340, margin=dict(l=10, r=10, t=40, b=10))
-            st.plotly_chart(fig_hist, use_container_width=True, config=config_plotly)
 
 except Exception as e:
     st.error(f"Error al cargar la visualización: {e}")
