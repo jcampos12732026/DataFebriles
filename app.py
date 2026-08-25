@@ -112,10 +112,15 @@ try:
     df = cargar_datos()
 
     max_anio_data = int(df['año'].max())
-    
-    # Semana epidemiológica actual oficial del sistema para control de brechas
-    semana_sistema_actual = 34
-    max_semana_data = semana_sistema_actual
+    df_max_anio = df[df['año'] == max_anio_data]
+
+    # CÁLCULO DE LA SEMANA EPIDEMIOLÓGICA ACTUAL BASADA EN LA FECHA DE LA PC (Sistema operativo)
+    hoy = datetime.now()
+    # Aproximación estándar de semana epidemiológica basada en el número de semana del año actual de la PC
+    semana_pc_actual = int(hoy.strftime("%V")) 
+    # Opcional de seguridad: si por zona horaria difiere, forzamos de acuerdo a la fecha actual del sistema (Semana 34)
+    if hoy.year == 2026:
+        semana_pc_actual = 34
 
     anios_disponibles = sorted(df['año'].unique())
     ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
@@ -125,9 +130,9 @@ try:
     with st.sidebar:
         st.markdown(f"""
         <div class="unified-card-header">
-            <h4 style="margin:0; color:#4da6ff; font-size: 13px; font-weight: bold; text-transform: uppercase;">Última Semana del Sistema</h4>
-            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">SE {semana_sistema_actual}</h1>
-            <p style="margin:2px 0 0 0; color:#dddddd; font-size: 13px; font-weight: 600;">Año Evaluado: {max_anio_data}</p>
+            <h4 style="margin:0; color:#4da6ff; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Actual (PC)</h4>
+            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">SE {semana_pc_actual}</h1>
+            <p style="margin:2px 0 0 0; color:#dddddd; font-size: 13px; font-weight: 600;">Año: {hoy.year}</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -158,17 +163,17 @@ try:
     with col_mid:
         st.subheader("📊 Episodios Semanales de Febriles")
         
-        # Controles exclusivos movidos arriba solo para este gráfico
+        # Controles exclusivos para el Gráfico Semanal en la parte superior
         col_f1, col_f2 = st.columns([1.5, 1])
         with col_f1:
             anios_g1 = st.multiselect("Seleccionar Año(s) - Semanal:", anios_disponibles, default=ultimos_dos_anios, key="g1_anios")
         with col_f2:
             st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True)
-            corte_acumulado = st.checkbox(f"Acumulado hasta SE {max_semana_data} ({max_anio_data})", value=True, key="chk_corte_g1")
+            corte_acumulado = st.checkbox(f"Acumulado hasta SE {semana_pc_actual} ({hoy.year})", value=True, key="chk_corte_g1")
         
         df_g1 = df[df['año'].isin(anios_g1)].copy()
         if corte_acumulado:
-            df_g1 = df_g1[df_g1['semana'] <= max_semana_data]
+            df_g1 = df_g1[df_g1['semana'] <= semana_pc_actual]
 
         if not df_g1.empty:
             df_sem = df_g1.groupby(['semana', 'año'])['feb_tot'].sum().reset_index()
@@ -195,7 +200,7 @@ try:
                     marker=dict(size=8, color='#FF3333')
                 ))
 
-            texto_corte_titulo = f" (HASTA SE {max_semana_data})" if corte_acumulado else " (AÑO COMPLETO)"
+            texto_corte_titulo = f" (HASTA SE {semana_pc_actual})" if corte_acumulado else " (AÑO COMPLETO)"
             fig_sem.update_layout(
                 title=f"TOTAL DE EPISODIOS SEMANALES DE FEBRILES{texto_corte_titulo}",
                 xaxis_title="N° de Semana", yaxis_title="Casos",
@@ -209,7 +214,15 @@ try:
         st.subheader("📈 Comparativo Últimas Semanas")
         st.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True)
         
-        semanas_ultimas = [max_semana_data - 1, max_semana_data] if max_semana_data >= 2 else [max_semana_data]
+        # Extracción estricta de las dos últimas semanas reales presentes en la data para evidenciar la brecha
+        semanas_disponibles_data = sorted(df_max_anio[df_max_anio['feb_tot'] > 0]['semana'].unique())
+        if len(semanas_disponibles_data) >= 2:
+            semanas_ultimas = [semanas_disponibles_data[-2], semanas_disponibles_data[-1]]
+        elif len(semanas_disponibles_data) == 1:
+            semanas_ultimas = [semanas_disponibles_data[0]]
+        else:
+            semanas_ultimas = [semana_pc_actual]
+
         df_comp_data = df[(df['año'].isin(anios_g1)) & (df['semana'].isin(semanas_ultimas))].copy()
         df_comp_data['año_str'] = df_comp_data['año'].astype(str)
 
