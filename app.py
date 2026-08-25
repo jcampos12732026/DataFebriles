@@ -114,10 +114,8 @@ try:
     max_anio_data = int(df['año'].max())
     df_max_anio = df[df['año'] == max_anio_data]
 
-    # Semana máxima real que contiene datos en el año más reciente de la data (ej. Semana 7 para 2026)
     max_semana_real_data = int(df_max_anio[df_max_anio['feb_tot'] > 0]['semana'].max()) if not df_max_anio.empty else 1
 
-    # Semana actual de la PC para la tarjeta lateral
     hoy = datetime.now()
     semana_pc_actual = int(hoy.strftime("%V")) 
     if hoy.year == 2026:
@@ -142,7 +140,6 @@ try:
 
     # --- ÁREA PRINCIPAL ---
     
-    # Banner Homenaje
     st.markdown("""
     <div class="homenaje-banner">
         ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
@@ -150,7 +147,6 @@ try:
     </div>
     """, unsafe_allow_html=True)
 
-    # Logotipo Institucional
     if os.path.exists("logo_minsa.png"):
         st.image("logo_minsa.png", use_container_width=True)
     else:
@@ -161,7 +157,7 @@ try:
     # ==========================================
     col_mid, col_right = st.columns([1.8, 1])
 
-    # --- GRÁFICO 1: Episodios Semanales (Con lógica de recorte condicional al año actual seleccionado) ---
+    # --- GRÁFICO 1: Episodios Semanales ---
     with col_mid:
         st.subheader("📊 Episodios Semanales de Febriles")
         
@@ -170,7 +166,6 @@ try:
             anios_g1 = st.multiselect("Seleccionar Año(s) - Semanal:", anios_disponibles, default=ultimos_dos_anios, key="g1_anios")
         with col_f2:
             st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True)
-            # El checkbox solo se habilita/aplica si el usuario seleccionó el año más reciente (máximo año con data, ej. 2026)
             incluye_anio_actual = max_anio_data in anios_g1
             label_chk = f"Acumulado hasta SE {max_semana_real_data} ({max_anio_data})"
             corte_acumulado = st.checkbox(label_chk, value=True if incluye_anio_actual else False, disabled=not incluye_anio_actual, key="chk_corte_g1")
@@ -191,7 +186,9 @@ try:
                     df_anio = df_sem[df_sem['año'] == anio].sort_values('semana')
                     fig_sem.add_trace(go.Bar(
                         x=df_anio['semana'], y=df_anio['feb_tot'],
-                        name=str(anio), marker_color=colores_barras[idx % len(colores_barras)], opacity=0.75
+                        name=str(anio), marker_color=colores_barras[idx % len(colores_barras)], opacity=0.75,
+                        text=df_anio['feb_tot'], textposition='auto',
+                        textfont=dict(size=13, color='white') # <--- Números más grandes en barras
                     ))
 
             if max_anio_presente in anios_en_datos:
@@ -200,6 +197,7 @@ try:
                     x=df_ultimo['semana'], y=df_ultimo['feb_tot'],
                     name=f"{max_anio_presente} (Actual)", mode='lines+markers+text',
                     text=df_ultimo['feb_tot'], textposition="top center",
+                    textfont=dict(size=14, color='#FF3333', family='sans-serif', weight='bold'), # <--- Números más grandes en línea
                     line=dict(shape='spline', smoothing=1.3, width=4, color='#FF3333'),
                     marker=dict(size=8, color='#FF3333')
                 ))
@@ -214,7 +212,7 @@ try:
             )
             st.plotly_chart(fig_sem, use_container_width=True, config=config_plotly)
 
-    # --- GRÁFICO 2: Comparativo Últimas Semanas (Independiente) ---
+    # --- GRÁFICO 2: Comparativo Últimas Semanas ---
     with col_right:
         st.subheader("📈 Comparativo Últimas Semanas")
         
@@ -235,10 +233,11 @@ try:
             df_comp = df_comp_data.groupby(['semana', 'año_str'])['feb_tot'].sum().reset_index()
             fig_ult = px.bar(
                 df_comp, x='semana', y='feb_tot', color='año_str', barmode='group',
-                text_auto=True, template="plotly_dark",
+                text='feb_tot', template="plotly_dark",
                 title=f"Semanas {' y '.join(map(str, semanas_ultimas))}",
                 labels={'semana': 'N° de Semana', 'feb_tot': 'Casos', 'año_str': 'Año'}
             )
+            fig_ult.update_traces(textfont_size=13, textposition='auto') # <--- Números más grandes en comparativo
             fig_ult.update_xaxes(type='category')
             fig_ult.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_ult, use_container_width=True, config=config_plotly)
@@ -263,10 +262,11 @@ try:
 
             fig_mes = px.bar(
                 df_mes, x='mes_nom', y='feb_tot',
-                text_auto=True, template="plotly_dark",
+                text='feb_tot', template="plotly_dark",
                 title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS - AÑO {anio_mes_sel}",
                 labels={'mes_nom': 'Mes', 'feb_tot': 'Casos'}
             )
+            fig_mes.update_traces(textfont_size=12, textposition='auto')
             fig_mes.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=320, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_mes, use_container_width=True, config=config_plotly)
 
