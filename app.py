@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS unificados y limpios con brillo sutil para el banner de nombres
+# Estilos CSS unificados con el brillo sutil y elegante para el banner de homenaje
 st.markdown("""
     <style>
     .stApp {
@@ -129,12 +129,12 @@ try:
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<h4 style='color:#ffffff; font-size: 14px; margin-top: 10px; font-weight: bold;'>⚙️ Filtro Global del Sistema</h4>", unsafe_allow_html=True)
-        corte_acumulado = st.checkbox(f"Acumulado hasta SE {max_semana_data} ({max_anio_data})", value=True)
+        st.markdown("<h4 style='color:#ffffff; font-size: 14px; margin-top: 10px; font-weight: bold;'>⚙️ Estado del Sistema</h4>", unsafe_allow_html=True)
+        st.info("Utilice los filtros independientes sobre cada gráfico para personalizar la visualización al estilo Power BI.")
 
     # --- ÁREA PRINCIPAL ---
     
-    # Banner Homenaje con brillo sutil y nombres
+    # Banner Homenaje con brillo sutil y los nombres de las compañeras
     st.markdown("""
     <div class="homenaje-banner">
         ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
@@ -149,15 +149,20 @@ try:
         st.markdown('<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
     # ==========================================
-    # FILA 1: Gráfico Semanal y Gráfico Comparativo de Últimas Semanas (Con sus filtros independientes)
+    # FILA 1: Gráfico Semanal y Comparativo de Últimas Semanas
     # ==========================================
     col_mid, col_right = st.columns([1.8, 1])
 
     with col_mid:
         st.subheader("📊 Episodios Semanales de Febriles")
         
-        # Filtro independiente para el Gráfico 1 (tipo Power BI)
-        anios_g1 = st.multiselect("Seleccionar Año(s) - Semanal:", anios_disponibles, default=ultimos_dos_anios, key="g1_anios")
+        # Controles exclusivos para el Gráfico Semanal en la parte superior
+        col_f1, col_f2 = st.columns([1.5, 1])
+        with col_f1:
+            anios_g1 = st.multiselect("Seleccionar Año(s) - Semanal:", anios_disponibles, default=ultimos_dos_anios, key="g1_anios")
+        with col_f2:
+            st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True) # Espaciador visual alineado
+            corte_acumulado = st.checkbox(f"Acumulado hasta SE {max_semana_data} ({max_anio_data})", value=True, key="chk_corte_g1")
         
         df_g1 = df[df['año'].isin(anios_g1)].copy()
         if corte_acumulado:
@@ -188,8 +193,9 @@ try:
                     marker=dict(size=8, color='#FF3333')
                 ))
 
+            texto_corte_titulo = f" (HASTA SE {max_semana_data})" if corte_acumulado else " (AÑO COMPLETO)"
             fig_sem.update_layout(
-                title="TOTAL DE EPISODIOS SEMANALES DE FEBRILES",
+                title=f"TOTAL DE EPISODIOS SEMANALES DE FEBRILES{texto_corte_titulo}",
                 xaxis_title="N° de Semana", yaxis_title="Casos",
                 template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                 height=340, margin=dict(l=10, r=10, t=40, b=10), xaxis=dict(type='category'), barmode='group',
@@ -199,6 +205,7 @@ try:
 
     with col_right:
         st.subheader("📈 Comparativo Últimas Semanas")
+        st.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True) # Espaciador para alinear con el gráfico de al lado
         
         # Sincronizado con el corte de la semana máxima del sistema
         semanas_ultimas = [max_semana_data - 1, max_semana_data] if corte_acumulado and max_semana_data >= 2 else [max_semana_data]
@@ -220,7 +227,7 @@ try:
     st.divider()
 
     # ==========================================
-    # FILA 2: Gráfico Mensualizado y Evolución Anual (Con sus filtros independientes)
+    # FILA 2: Gráfico Mensualizado y Evolución Anual
     # ==========================================
     col_mes, col_hist = st.columns([1.5, 1])
 
