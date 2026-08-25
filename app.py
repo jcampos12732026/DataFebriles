@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS unificados con el brillo sutil y elegante para el banner de homenaje
+# Estilos CSS unificados
 st.markdown("""
     <style>
     .stApp {
@@ -114,7 +114,10 @@ try:
     max_anio_data = int(df['año'].max())
     df_max_anio = df[df['año'] == max_anio_data]
 
-    # Semana epidemiológica actual basada en la fecha de la PC (Sistema operativo)
+    # Semana máxima real que contiene datos en el año más reciente de la data (ej. Semana 7 para 2026)
+    max_semana_real_data = int(df_max_anio[df_max_anio['feb_tot'] > 0]['semana'].max()) if not df_max_anio.empty else 1
+
+    # Semana actual de la PC para la tarjeta lateral
     hoy = datetime.now()
     semana_pc_actual = int(hoy.strftime("%V")) 
     if hoy.year == 2026:
@@ -135,7 +138,7 @@ try:
         """, unsafe_allow_html=True)
         
         st.markdown("<h4 style='color:#ffffff; font-size: 14px; margin-top: 10px; font-weight: bold;'>⚙️ Estado del Sistema</h4>", unsafe_allow_html=True)
-        st.info("Gráficos configurados de manera totalmente independiente.")
+        st.info("Módulos independientes operativos.")
 
     # --- ÁREA PRINCIPAL ---
     
@@ -154,11 +157,11 @@ try:
         st.markdown('<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
     # ==========================================
-    # FILA 1: Gráfico Semanal y Comparativo de Últimas Semanas (TOTALMENTE INDEPENDIENTES)
+    # FILA 1: Gráfico Semanal y Comparativo de Últimas Semanas
     # ==========================================
     col_mid, col_right = st.columns([1.8, 1])
 
-    # --- GRÁFICO 1: Episodios Semanales (Filtros propios) ---
+    # --- GRÁFICO 1: Episodios Semanales (Con lógica de recorte condicional al año actual seleccionado) ---
     with col_mid:
         st.subheader("📊 Episodios Semanales de Febriles")
         
@@ -167,11 +170,14 @@ try:
             anios_g1 = st.multiselect("Seleccionar Año(s) - Semanal:", anios_disponibles, default=ultimos_dos_anios, key="g1_anios")
         with col_f2:
             st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True)
-            corte_acumulado = st.checkbox(f"Acumulado hasta SE {semana_pc_actual} ({hoy.year})", value=True, key="chk_corte_g1")
+            # El checkbox solo se habilita/aplica si el usuario seleccionó el año más reciente (máximo año con data, ej. 2026)
+            incluye_anio_actual = max_anio_data in anios_g1
+            label_chk = f"Acumulado hasta SE {max_semana_real_data} ({max_anio_data})"
+            corte_acumulado = st.checkbox(label_chk, value=True if incluye_anio_actual else False, disabled=not incluye_anio_actual, key="chk_corte_g1")
         
         df_g1 = df[df['año'].isin(anios_g1)].copy()
-        if corte_acumulado:
-            df_g1 = df_g1[df_g1['semana'] <= semana_pc_actual]
+        if incluye_anio_actual and corte_acumulado:
+            df_g1 = df_g1[df_g1['semana'] <= max_semana_real_data]
 
         if not df_g1.empty:
             df_sem = df_g1.groupby(['semana', 'año'])['feb_tot'].sum().reset_index()
@@ -198,7 +204,7 @@ try:
                     marker=dict(size=8, color='#FF3333')
                 ))
 
-            texto_corte_titulo = f" (HASTA SE {semana_pc_actual})" if corte_acumulado else " (AÑO COMPLETO)"
+            texto_corte_titulo = f" (HASTA SE {max_semana_real_data})" if (incluye_anio_actual and corte_acumulado) else " (AÑOS COMPLETOS)"
             fig_sem.update_layout(
                 title=f"TOTAL DE EPISODIOS SEMANALES DE FEBRILES{texto_corte_titulo}",
                 xaxis_title="N° de Semana", yaxis_title="Casos",
@@ -208,14 +214,12 @@ try:
             )
             st.plotly_chart(fig_sem, use_container_width=True, config=config_plotly)
 
-    # --- GRÁFICO 2: Comparativo Últimas Semanas (Filtros propios e independientes) ---
+    # --- GRÁFICO 2: Comparativo Últimas Semanas (Independiente) ---
     with col_right:
         st.subheader("📈 Comparativo Últimas Semanas")
         
-        # Selector de años independiente exclusivo para este gráfico
         anios_g2 = st.multiselect("Seleccionar Año(s) - Últimas Semanas:", anios_disponibles, default=ultimos_dos_anios, key="g2_anios_independiente")
         
-        # Extracción estricta de las dos últimas semanas reales presentes en la data
         semanas_disponibles_data = sorted(df_max_anio[df_max_anio['feb_tot'] > 0]['semana'].unique())
         if len(semanas_disponibles_data) >= 2:
             semanas_ultimas = [semanas_disponibles_data[-2], semanas_disponibles_data[-1]]
@@ -242,7 +246,7 @@ try:
     st.divider()
 
     # ==========================================
-    # FILA 2: Gráfico Mensualizado y Evolución Anual
+    # FILA 2: Gráfico Mensualizado y Evolución Anual (Intactos)
     # ==========================================
     col_mes, col_hist = st.columns([1.5, 1])
 
