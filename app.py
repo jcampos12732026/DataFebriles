@@ -114,11 +114,9 @@ try:
     max_anio_data = int(df['año'].max())
     df_max_anio = df[df['año'] == max_anio_data]
 
-    # CÁLCULO DE LA SEMANA EPIDEMIOLÓGICA ACTUAL BASADA EN LA FECHA DE LA PC (Sistema operativo)
+    # Semana epidemiológica actual basada en la fecha de la PC (Sistema operativo)
     hoy = datetime.now()
-    # Aproximación estándar de semana epidemiológica basada en el número de semana del año actual de la PC
     semana_pc_actual = int(hoy.strftime("%V")) 
-    # Opcional de seguridad: si por zona horaria difiere, forzamos de acuerdo a la fecha actual del sistema (Semana 34)
     if hoy.year == 2026:
         semana_pc_actual = 34
 
@@ -137,11 +135,11 @@ try:
         """, unsafe_allow_html=True)
         
         st.markdown("<h4 style='color:#ffffff; font-size: 14px; margin-top: 10px; font-weight: bold;'>⚙️ Estado del Sistema</h4>", unsafe_allow_html=True)
-        st.info("Utilice los filtros independientes sobre cada gráfico para personalizar la visualización al estilo Power BI.")
+        st.info("Gráficos configurados de manera totalmente independiente.")
 
     # --- ÁREA PRINCIPAL ---
     
-    # Banner Homenaje con brillo sutil y los nombres de las compañeras
+    # Banner Homenaje
     st.markdown("""
     <div class="homenaje-banner">
         ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
@@ -156,14 +154,14 @@ try:
         st.markdown('<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
     # ==========================================
-    # FILA 1: Gráfico Semanal y Comparativo de Últimas Semanas
+    # FILA 1: Gráfico Semanal y Comparativo de Últimas Semanas (TOTALMENTE INDEPENDIENTES)
     # ==========================================
     col_mid, col_right = st.columns([1.8, 1])
 
+    # --- GRÁFICO 1: Episodios Semanales (Filtros propios) ---
     with col_mid:
         st.subheader("📊 Episodios Semanales de Febriles")
         
-        # Controles exclusivos para el Gráfico Semanal en la parte superior
         col_f1, col_f2 = st.columns([1.5, 1])
         with col_f1:
             anios_g1 = st.multiselect("Seleccionar Año(s) - Semanal:", anios_disponibles, default=ultimos_dos_anios, key="g1_anios")
@@ -210,11 +208,14 @@ try:
             )
             st.plotly_chart(fig_sem, use_container_width=True, config=config_plotly)
 
+    # --- GRÁFICO 2: Comparativo Últimas Semanas (Filtros propios e independientes) ---
     with col_right:
         st.subheader("📈 Comparativo Últimas Semanas")
-        st.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True)
         
-        # Extracción estricta de las dos últimas semanas reales presentes en la data para evidenciar la brecha
+        # Selector de años independiente exclusivo para este gráfico
+        anios_g2 = st.multiselect("Seleccionar Año(s) - Últimas Semanas:", anios_disponibles, default=ultimos_dos_anios, key="g2_anios_independiente")
+        
+        # Extracción estricta de las dos últimas semanas reales presentes en la data
         semanas_disponibles_data = sorted(df_max_anio[df_max_anio['feb_tot'] > 0]['semana'].unique())
         if len(semanas_disponibles_data) >= 2:
             semanas_ultimas = [semanas_disponibles_data[-2], semanas_disponibles_data[-1]]
@@ -223,7 +224,7 @@ try:
         else:
             semanas_ultimas = [semana_pc_actual]
 
-        df_comp_data = df[(df['año'].isin(anios_g1)) & (df['semana'].isin(semanas_ultimas))].copy()
+        df_comp_data = df[(df['año'].isin(anios_g2)) & (df['semana'].isin(semanas_ultimas))].copy()
         df_comp_data['año_str'] = df_comp_data['año'].astype(str)
 
         if not df_comp_data.empty:
@@ -248,7 +249,7 @@ try:
     with col_mes:
         st.subheader("📅 Episodios Mensualizados")
         
-        anio_mes_sel = st.selectbox("Seleccionar Año - Mensual:", anios_disponibles, index=len(anios_disponibles)-1, key="g2_anio_unico")
+        anio_mes_sel = st.selectbox("Seleccionar Año - Mensual:", anios_disponibles, index=len(anios_disponibles)-1, key="g3_anio_unico")
         df_mes_base = df[df['año'] == anio_mes_sel].copy()
 
         if not df_mes_base.empty:
@@ -268,7 +269,7 @@ try:
     with col_hist:
         st.subheader("📉 Evolución Anual Acumulada")
         
-        anios_hist = st.multiselect("Seleccionar Año(s) - Anual:", anios_disponibles, default=anios_disponibles, key="g3_anios")
+        anios_hist = st.multiselect("Seleccionar Año(s) - Anual:", anios_disponibles, default=anios_disponibles, key="g4_anios")
         df_hist_base = df[df['año'].isin(anios_hist)].copy()
         
         if not df_hist_base.empty:
