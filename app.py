@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import os
+from datetime import datetime
 
 # Configuración de página
 st.set_page_config(
@@ -110,10 +111,11 @@ config_plotly = {'displayModeBar': 'hover'}
 try:
     df = cargar_datos()
 
-    # Cálculo automático original de la semana máxima del sistema según los datos
     max_anio_data = int(df['año'].max())
-    df_max_anio = df[df['año'] == max_anio_data]
-    max_semana_data = int(df_max_anio[df_max_anio['feb_tot'] > 0]['semana'].max())
+    
+    # Semana epidemiológica actual oficial del sistema para control de brechas
+    semana_sistema_actual = 34
+    max_semana_data = semana_sistema_actual
 
     anios_disponibles = sorted(df['año'].unique())
     ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
@@ -123,8 +125,8 @@ try:
     with st.sidebar:
         st.markdown(f"""
         <div class="unified-card-header">
-            <h4 style="margin:0; color:#4da6ff; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Registrada Máxima</h4>
-            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">SE {max_semana_data}</h1>
+            <h4 style="margin:0; color:#4da6ff; font-size: 13px; font-weight: bold; text-transform: uppercase;">Última Semana del Sistema</h4>
+            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">SE {semana_sistema_actual}</h1>
             <p style="margin:2px 0 0 0; color:#dddddd; font-size: 13px; font-weight: 600;">Año Evaluado: {max_anio_data}</p>
         </div>
         """, unsafe_allow_html=True)
@@ -207,7 +209,6 @@ try:
         st.subheader("📈 Comparativo Últimas Semanas")
         st.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True)
         
-        # Lógica original restaurada para el comparativo de últimas semanas con la data real
         semanas_ultimas = [max_semana_data - 1, max_semana_data] if max_semana_data >= 2 else [max_semana_data]
         df_comp_data = df[(df['año'].isin(anios_g1)) & (df['semana'].isin(semanas_ultimas))].copy()
         df_comp_data['año_str'] = df_comp_data['año'].astype(str)
