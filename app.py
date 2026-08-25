@@ -20,24 +20,25 @@ st.markdown("""
         color: #ffffff;
     }
 
-    .homenaje-banner {
-        background: linear-gradient(90deg, rgba(20,30,48,0.85), rgba(36,59,85,0.85));
+    .homenaje-banner-sidebar {
+        background: linear-gradient(135deg, rgba(20,30,48,0.95), rgba(36,59,85,0.95));
         border: 1px solid rgba(255, 215, 0, 0.6);
         border-radius: 8px;
-        padding: 8px 15px;
+        padding: 10px;
         text-align: center;
         color: #ffeb3b;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 500;
-        margin-bottom: 15px;
-        box-shadow: 0 0 15px rgba(255, 215, 0, 0.35), inset 0 0 10px rgba(255, 255, 255, 0.1);
-        text-shadow: 0 0 8px rgba(255, 235, 59, 0.5);
+        margin-top: 15px;
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.25), inset 0 0 10px rgba(255, 255, 255, 0.1);
+        text-shadow: 0 0 6px rgba(255, 235, 59, 0.4);
     }
-    .homenaje-banner span {
+    .homenaje-banner-sidebar span {
         color: #ffffff;
         font-weight: bold;
-        margin: 0 5px;
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        display: block;
+        margin-top: 3px;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
     }
 
     .block-container {
@@ -138,26 +139,27 @@ try:
         st.markdown("<h4 style='color:#ffffff; font-size: 14px; margin-top: 10px; font-weight: bold;'>⚙️ Estado del Sistema</h4>", unsafe_allow_html=True)
         st.info("Módulos independientes operativos.")
 
-    # --- ÁREA PRINCIPAL ---
-    
-    st.markdown("""
-    <div class="homenaje-banner">
-        ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
-        <span>Angela Neyra</span> ⭐ <span>Violeta Huacho</span> ⭐ <span>Celia Silva</span> ✨
-    </div>
-    """, unsafe_allow_html=True)
+        # --- BANNER DE HOMENAJE EN LA BARRA LATERAL ---
+        st.markdown("""
+        <div class="homenaje-banner-sidebar">
+            ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
+            <span>⭐ Angela Neyra</span>
+            <span>⭐ Violeta Huacho</span>
+            <span>⭐ Celia Silva</span> ✨
+        </div>
+        """, unsafe_allow_html=True)
 
+    # --- ÁREA PRINCIPAL ---
     if os.path.exists("logo_minsa.png"):
         st.image("logo_minsa.png", use_container_width=True)
     else:
-        st.markdown('<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px;">Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
+        st.markdown('<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>', unsafe_allow_html=True)
 
     # ==========================================
     # FILA 1: Episodios Semanales y Episodios Mensualizados
     # ==========================================
     col_mid, col_mes = st.columns([1.8, 1])
 
-    # --- GRÁFICO 1: Episodios Semanales ---
     with col_mid:
         st.subheader("📊 Episodios Semanales de Febriles")
         
@@ -212,7 +214,6 @@ try:
             )
             st.plotly_chart(fig_sem, use_container_width=True, config=config_plotly)
 
-    # --- GRÁFICO 3: Episodios Mensualizados (Multiselección) ---
     with col_mes:
         st.subheader("📅 Episodios Mensualizados")
         
@@ -234,7 +235,7 @@ try:
             fig_mes = px.bar(
                 df_mes, x='mes_nom', y='feb_tot',
                 text='feb_tot', template="plotly_dark",
-                title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS {rango_str}",
+                title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS {rango_str} DEL CENTRO DE SALUD CÉSAR LÓPEZ SILVA/RIS CHACLACAYO/DIRIS LIMA ESTE",
                 labels={'mes_nom': 'Mes', 'feb_tot': 'Casos'}
             )
             fig_mes.update_traces(textfont_size=13, textposition='auto')
@@ -248,7 +249,6 @@ try:
     # ==========================================
     col_hist, col_right = st.columns([1.8, 1])
 
-    # --- GRÁFICO 4: Evolución Anual Acumulada (Largo con línea suavizada tipo spline) ---
     with col_hist:
         st.subheader("📉 Evolución Anual Acumulada")
         
@@ -278,7 +278,6 @@ try:
             )
             st.plotly_chart(fig_hist, use_container_width=True, config=config_plotly)
 
-    # --- GRÁFICO 2: Comparativo Últimas Semanas (Estrecho a la derecha) ---
     with col_right:
         st.subheader("📈 Comparativo Últimas Semanas")
         
