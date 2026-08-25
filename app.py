@@ -110,10 +110,10 @@ config_plotly = {'displayModeBar': 'hover'}
 try:
     df = cargar_datos()
 
-    # Cálculo automático de la semana actual/máxima del sistema según datos
     max_anio_data = int(df['año'].max())
-    df_max_anio = df[df['año'] == max_anio_data]
-    max_semana_data = int(df_max_anio[df_max_anio['feb_tot'] > 0]['semana'].max())
+    
+    # Semana epidemiológica fijada estricta en 34 a petición del usuario
+    max_semana_data = 34
 
     anios_disponibles = sorted(df['año'].unique())
     ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
@@ -161,7 +161,7 @@ try:
         with col_f1:
             anios_g1 = st.multiselect("Seleccionar Año(s) - Semanal:", anios_disponibles, default=ultimos_dos_anios, key="g1_anios")
         with col_f2:
-            st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True) # Espaciador visual alineado
+            st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True)
             corte_acumulado = st.checkbox(f"Acumulado hasta SE {max_semana_data} ({max_anio_data})", value=True, key="chk_corte_g1")
         
         df_g1 = df[df['año'].isin(anios_g1)].copy()
@@ -205,10 +205,10 @@ try:
 
     with col_right:
         st.subheader("📈 Comparativo Últimas Semanas")
-        st.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True) # Espaciador para alinear con el gráfico de al lado
+        st.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True)
         
-        # Sincronizado con el corte de la semana máxima del sistema
-        semanas_ultimas = [max_semana_data - 1, max_semana_data] if corte_acumulado and max_semana_data >= 2 else [max_semana_data]
+        # Sincronizado exclusivamente con las últimas semanas de la SE 34 fija
+        semanas_ultimas = [max_semana_data - 1, max_semana_data] if max_semana_data >= 2 else [max_semana_data]
         df_comp_data = df[(df['año'].isin(anios_g1)) & (df['semana'].isin(semanas_ultimas))].copy()
         df_comp_data['año_str'] = df_comp_data['año'].astype(str)
 
@@ -227,16 +227,14 @@ try:
     st.divider()
 
     # ==========================================
-    # FILA 2: Gráfico Mensualizado y Evolución Anual
+    # FILA 2: Gráfico Mensualizado y Evolución Anual (Independientes del check semanal)
     # ==========================================
     col_mes, col_hist = st.columns([1.5, 1])
 
     with col_mes:
         st.subheader("📅 Episodios Mensualizados")
         
-        # Filtro independiente estilo segmentación de Power BI para el gráfico mensual
         anio_mes_sel = st.selectbox("Seleccionar Año - Mensual:", anios_disponibles, index=len(anios_disponibles)-1, key="g2_anio_unico")
-        
         df_mes_base = df[df['año'] == anio_mes_sel].copy()
 
         if not df_mes_base.empty:
@@ -256,9 +254,7 @@ try:
     with col_hist:
         st.subheader("📉 Evolución Anual Acumulada")
         
-        # Filtro independiente de años para el gráfico histórico anual
         anios_hist = st.multiselect("Seleccionar Año(s) - Anual:", anios_disponibles, default=anios_disponibles, key="g3_anios")
-        
         df_hist_base = df[df['año'].isin(anios_hist)].copy()
         
         if not df_hist_base.empty:
