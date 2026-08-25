@@ -188,7 +188,7 @@ try:
                         x=df_anio['semana'], y=df_anio['feb_tot'],
                         name=str(anio), marker_color=colores_barras[idx % len(colores_barras)], opacity=0.75,
                         text=df_anio['feb_tot'], textposition='auto',
-                        textfont=dict(size=13, color='white') # <--- Números más grandes en barras
+                        textfont=dict(size=13, color='white')
                     ))
 
             if max_anio_presente in anios_en_datos:
@@ -197,7 +197,7 @@ try:
                     x=df_ultimo['semana'], y=df_ultimo['feb_tot'],
                     name=f"{max_anio_presente} (Actual)", mode='lines+markers+text',
                     text=df_ultimo['feb_tot'], textposition="top center",
-                    textfont=dict(size=14, color='#FF3333', family='sans-serif', weight='bold'), # <--- Números más grandes en línea
+                    textfont=dict(size=14, color='#FF3333', family='sans-serif', weight='bold'),
                     line=dict(shape='spline', smoothing=1.3, width=4, color='#FF3333'),
                     marker=dict(size=8, color='#FF3333')
                 ))
@@ -237,7 +237,7 @@ try:
                 title=f"Semanas {' y '.join(map(str, semanas_ultimas))}",
                 labels={'semana': 'N° de Semana', 'feb_tot': 'Casos', 'año_str': 'Año'}
             )
-            fig_ult.update_traces(textfont_size=13, textposition='auto') # <--- Números más grandes en comparativo
+            fig_ult.update_traces(textfont_size=13, textposition='auto')
             fig_ult.update_xaxes(type='category')
             fig_ult.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_ult, use_container_width=True, config=config_plotly)
@@ -245,29 +245,38 @@ try:
     st.divider()
 
     # ==========================================
-    # FILA 2: Gráfico Mensualizado y Evolución Anual (Intactos)
+    # FILA 2: Gráfico Mensualizado (Multiselección de Años) y Evolución Anual
     # ==========================================
     col_mes, col_hist = st.columns([1.5, 1])
 
     with col_mes:
         st.subheader("📅 Episodios Mensualizados")
         
-        anio_mes_sel = st.selectbox("Seleccionar Año - Mensual:", anios_disponibles, index=len(anios_disponibles)-1, key="g3_anio_unico")
-        df_mes_base = df[df['año'] == anio_mes_sel].copy()
+        # Multiselect para años en el gráfico mensualizado
+        anios_mes_sel = st.multiselect("Año(s) - Mensual:", anios_disponibles, default=ultimos_dos_anios, key="g3_anios_multiselect")
+        df_mes_base = df[df['año'].isin(anios_mes_sel)].copy()
 
         if not df_mes_base.empty:
             df_mes = df_mes_base.groupby('mes_nom')['feb_tot'].sum().reset_index()
             df_mes['mes_nom'] = pd.Categorical(df_mes['mes_nom'], categories=orden_meses, ordered=True)
             df_mes = df_mes.sort_values('mes_nom')
 
+            # Rango dinámico de años para el título del gráfico
+            if anios_mes_sel:
+                min_sel = min(anios_mes_sel)
+                max_sel = max(anios_mes_sel)
+                rango_str = f"DESDE EL AÑO {min_sel} HASTA EL AÑO {max_sel}" if len(anios_mes_sel) > 1 else f"AÑO {min_sel}"
+            else:
+                rango_str = "SELECCIONADOS"
+
             fig_mes = px.bar(
                 df_mes, x='mes_nom', y='feb_tot',
                 text='feb_tot', template="plotly_dark",
-                title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS - AÑO {anio_mes_sel}",
+                title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS {rango_str} DEL CENTRO DE SALUD CÉSAR LÓPEZ SILVA/RIS CHACLACAYO/DIRIS LIMA ESTE",
                 labels={'mes_nom': 'Mes', 'feb_tot': 'Casos'}
             )
-            fig_mes.update_traces(textfont_size=12, textposition='auto')
-            fig_mes.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=320, margin=dict(l=10, r=10, t=40, b=10))
+            fig_mes.update_traces(textfont_size=13, textposition='auto')
+            fig_mes.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_mes, use_container_width=True, config=config_plotly)
 
     with col_hist:
@@ -284,7 +293,7 @@ try:
                 markers=True, template="plotly_dark", color_discrete_sequence=['#ff7f0e']
             )
             fig_hist.update_xaxes(type='category')
-            fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=320, margin=dict(l=10, r=10, t=40, b=10))
+            fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=340, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_hist, use_container_width=True, config=config_plotly)
 
 except Exception as e:
