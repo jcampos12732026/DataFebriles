@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import pandas as pd
 import plotly.express as px
@@ -60,7 +60,7 @@ st.markdown(
         background: linear-gradient(145deg, #151c28, #1a2436);
         border: 2px solid #0056b3;
         border-radius: 10px;
-        padding: 12px 10px;
+        padding: 14px 10px;
         text-align: center;
         box-shadow: 0px 4px 12px rgba(0, 86, 179, 0.3);
         margin-bottom: 15px;
@@ -76,6 +76,26 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+
+# Función para calcular la Semana Epidemiológica en Perú (Inicio: Domingo)
+def obtener_semana_epidemiologica(fecha):
+  # Buscar el primer día del año
+  primer_dia = datetime(fecha.year, 1, 1)
+
+  # Encontrar el primer domingo del año
+  # fecha.weekday(): Lunes=0, ..., Domingo=6
+  dias_hasta_domingo = (6 - primer_dia.weekday()) % 7
+  primer_domingo = primer_dia + timedelta(days=dias_hasta_domingo)
+
+  if fecha < primer_domingo:
+    # Si la fecha es antes del primer domingo, pertenece a la última SE del año anterior
+    return obtener_semana_epidemiologica(datetime(fecha.year - 1, 12, 31))
+
+  # Días transcurridos desde el primer domingo
+  dias_transcurridos = (fecha - primer_domingo).days
+  semana = (dias_transcurridos // 7) + 1
+  return semana
 
 
 # Carga directa sin caché para actualización instantánea
@@ -160,9 +180,7 @@ try:
   max_mes_nombre_real_data = orden_meses[max_mes_num_real_data - 1]
 
   hoy = datetime.now()
-  semana_pc_actual = int(hoy.strftime("%V"))
-  if hoy.year == 2026:
-    semana_pc_actual = 34
+  semana_epidemiologica_actual = obtener_semana_epidemiologica(hoy)
 
   anios_disponibles = sorted(df["año"].unique())
   ultimos_dos_anios = (
@@ -176,9 +194,9 @@ try:
     st.markdown(
         f"""
         <div class="unified-card-header">
-            <h4 style="margin:0; color:#4da6ff; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Actual (PC)</h4>
-            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">SE {semana_pc_actual}</h1>
-            <p style="margin:2px 0 0 0; color:#dddddd; font-size: 13px; font-weight: 600;">Año: {hoy.year}</p>
+            <h4 style="margin:0; color:#4da6ff; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Actual</h4>
+            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">SE {semana_epidemiologica_actual}</h1>
+            <p style="margin:4px 0 0 0; color:#ffffff; font-size: 16px; font-weight: 700;">Año: {hoy.year}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -359,7 +377,6 @@ try:
 
     df_mes_base = df[df["año"].isin(anios_mes_sel)].copy()
 
-    # Filtro opcional por corte de mes
     if incluye_anio_actual_m and corte_acumulado_m:
       df_mes_base = df_mes_base[df_mes_base["mes_num"] <= max_mes_num_real_data]
 
@@ -370,7 +387,6 @@ try:
           .reset_index()
       )
 
-      # Ajuste de meses a mostrar según el filtro de corte
       meses_a_mostrar = (
           orden_meses[:max_mes_num_real_data]
           if (incluye_anio_actual_m and corte_acumulado_m)
@@ -397,7 +413,6 @@ try:
           "#19D3F3",
       ]
 
-      # Dibujar barras agrupadas para años anteriores
       for idx, anio in enumerate(anios_seleccionados_ordenados):
         if anio != max_anio_mes:
           df_anio_m = df_mes[df_mes["año"] == anio]
@@ -414,7 +429,6 @@ try:
               )
           )
 
-      # Dibujar línea suavizada con datos para el último año seleccionado
       if max_anio_mes is not None:
         df_ultimo_m = df_mes[df_mes["año"] == max_anio_mes]
         fig_mes.add_trace(
@@ -540,7 +554,7 @@ try:
     elif len(semanas_disponibles_data) == 1:
       semanas_ultimas = [semanas_disponibles_data[0]]
     else:
-      semanas_ultimas = [semana_pc_actual]
+      semanas_ultimas = [semana_epidemiologica_actual]
 
     df_comp_data = df[
         (df["año"].isin(anios_g2)) & (df["semana"].isin(semanas_ultimas))
