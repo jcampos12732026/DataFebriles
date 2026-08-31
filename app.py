@@ -260,15 +260,25 @@ else:
     )
 
 
-# --- 5TO GRÁFICO: GRUPOS ETARIOS APILADOS + TABLA (Exclusivo para IRAS) ---
+# --- 5TO GRÁFICO: GRUPOS ETARIOS APILADOS PROFESIONAL + TABLA (Exclusivo para IRAS) ---
 def renderizar_quinto_grafico_iras(df):
     cols_iras = ["ira_m2", "ira_2_11", "ira_1_4a"]
     if not all(c in df.columns for c in cols_iras):
         return
 
     st.divider()
+    
     st.markdown(
-        "<h3 style='color: #00CCFF; margin-top: 10px; margin-bottom: 5px;'>👶 Total episodios de IRAS anual de niños por grupo de edad (C.S. César López Silva)</h3>",
+        """
+        <div style="background: linear-gradient(135deg, rgba(0, 34, 68, 0.7), rgba(0, 51, 102, 0.9)); border-left: 5px solid #00CCFF; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px;">
+            <h3 style='color: #00CCFF; margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase;'>
+                👶 Distribución y Comportamiento Histórico por Grupos Etarios (IRAS)
+            </h3>
+            <p style='color: #a0aec0; margin: 3px 0 0 0; font-size: 12px;'>
+                Análisis apilado de episodios absolutos en menores de 5 años - C.S. César López Silva
+            </p>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
@@ -277,6 +287,8 @@ def renderizar_quinto_grafico_iras(df):
     )
 
     if not df_et_sum.empty:
+        df_et_sum["total_anual"] = df_et_sum["ira_m2"] + df_et_sum["ira_2_11"] + df_et_sum["ira_1_4a"]
+
         fig_et = px.bar(
             df_et_sum,
             x="año",
@@ -285,13 +297,13 @@ def renderizar_quinto_grafico_iras(df):
             template="plotly_dark",
             labels={
                 "value": "Total de Episodios",
-                "año": "Año",
-                "variable": "Grupo de Edad",
+                "año": "Año de Registro",
+                "variable": "Grupo etario",
             },
             color_discrete_map={
-                "ira_m2": "#0056B3",  # Azul (< de 2 Meses)
-                "ira_2_11": "#D96B00",  # Naranja (2M a 11 Meses)
-                "ira_1_4a": "#8C8C8C",  # Gris (1 a 4 Años)
+                "ira_m2": "#004080",    # Azul institucional oscuro (< de 2 Meses)
+                "ira_2_11": "#0088CC",  # Azul cian intermedio (2M a 11 Meses)
+                "ira_1_4a": "#4A90E2",  # Azul claro (1 a 4 Años)
             },
         )
 
@@ -304,28 +316,43 @@ def renderizar_quinto_grafico_iras(df):
             if serie.name in nombres_leyenda:
                 serie.name = nombres_leyenda[serie.name]
 
+        fig_et.add_trace(
+            go.Scatter(
+                x=df_et_sum["año"],
+                y=df_et_sum["total_anual"],
+                mode="text",
+                text=df_et_sum["total_anual"],
+                textposition="top center",
+                textfont=dict(size=12, color="#FFCC00", family="sans-serif", weight="bold"),
+                showlegend=False,
+                hoverinfo="skip"
+            )
+        )
+
         fig_et.update_layout(
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            height=450,
-            margin=dict(l=10, r=10, t=30, b=10),
-            xaxis=dict(type="category", dtick=1),
+            height=460,
+            margin=dict(l=20, r=20, t=40, b=10),
+            xaxis=dict(type="category", dtick=1, showgrid=False),
+            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.08)"),
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                orientation="h", yanchor="bottom", y=1.04, xanchor="right", x=1
             ),
         )
 
         st.plotly_chart(
-            fig_et, use_container_width=True, config=config_plotly
+            fig_et, use_container_width=True, config={"displayModeBar": "hover"}
         )
 
-        # Tabla resumen inferior idéntica a la imagen de referencia
-        df_tabla = df_et_sum.set_index("año").T
-        df_tabla.index = ["< de 2 Meses", "2M a 11 Meses", "1 a 4 Años"]
         st.markdown(
-            "<p style='font-size:12px; font-weight:bold; color:#00CCFF; margin-bottom:2px;'>REGISTRO NUMÉRICO POR AÑO</p>",
+            "<p style='font-size:12px; font-weight:bold; color:#00CCFF; margin-top: 15px; margin-bottom:5px; text-transform: uppercase;'>📋 Consolidado Numérico por Grupo Etario y Año</p>",
             unsafe_allow_html=True,
         )
+        
+        df_tabla = df_et_sum.set_index("año")[["ira_m2", "ira_2_11", "ira_1_4a", "total_anual"]].T
+        df_tabla.index = ["< de 2 Meses", "2M a 11 Meses", "1 a 4 Años", "TOTAL GENERAL"]
+        
         st.dataframe(df_tabla, use_container_width=True)
 
 
@@ -864,13 +891,11 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     fig_ult, use_container_width=True, config=config_plotly
                 )
         else:
-            # En IRAS, si gustas puedes mostrar un indicador o dejar espacio, 
-            # pero el gráfico principal de grupos etarios irá abajo como 5to gráfico completo.
             st.info(
-                "💡 El análisis por grupos etarios detallado se encuentra disponible en la sección inferior como 5to gráfico."
+                "💡 El análisis detallado por grupos etarios se encuentra desplegado en la sección inferior como 5to gráfico completo."
             )
 
-    # Si estamos en IRAS, renderizamos el 5to gráfico ocupando todo el ancho abajo
+    # Renderizar el 5to gráfico inferior exclusivo para IRAS
     if key_prefix == "iras":
         renderizar_quinto_grafico_iras(df)
 
