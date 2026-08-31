@@ -162,7 +162,6 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # Único selector de módulo
     modulo_seleccionado = st.radio(
         "Seleccionar Módulo:",
         ["🌡️ Febriles", "🫁 IRAS", "🦟 Dengue (Próximamente)"],
@@ -171,7 +170,6 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-# Carga de datos previa para calcular brecha según el módulo seleccionado
 if "Febriles" in modulo_seleccionado:
     df_actual_temp = cargar_datos_csv(
         "febriles_consolidado.csv", col_total_casos="feb_tot"
@@ -186,7 +184,6 @@ else:
     df_actual_temp = None
     titulo_evento_temp = "Dengue"
 
-# Cálculo de la brecha
 if (
     df_actual_temp is not None
     and not df_actual_temp.empty
@@ -208,8 +205,6 @@ else:
     max_semana_real_t = semana_epidemiologica_actual
     brecha_semanas_t = 0
 
-
-# Renderizado de Tarjetas Informativas en la Barra Lateral
 with st.sidebar:
     st.markdown(
         f"""
@@ -256,7 +251,6 @@ with st.sidebar:
         )
 
 
-# --- CABECERA PRINCIPAL ---
 if os.path.exists("logo_minsa.png"):
     st.image("logo_minsa.png", use_container_width=True)
 else:
@@ -266,87 +260,73 @@ else:
     )
 
 
-def renderizar_grafico_grupos_etarios(df, key_prefix):
+# --- 5TO GRÁFICO: GRUPOS ETARIOS APILADOS + TABLA (Exclusivo para IRAS) ---
+def renderizar_quinto_grafico_iras(df):
     cols_iras = ["ira_m2", "ira_2_11", "ira_1_4a"]
     if not all(c in df.columns for c in cols_iras):
         return
 
-    st.subheader("👶 Distribución por Grupos Etarios (< 5 Años)")
-
-    anios_disponibles = sorted(df["año"].unique())
-    ultimos_dos_anios = (
-        anios_disponibles[-2:]
-        if len(anios_disponibles) >= 2
-        else anios_disponibles
+    st.divider()
+    st.markdown(
+        "<h3 style='color: #00CCFF; margin-top: 10px; margin-bottom: 5px;'>👶 Total episodios de IRAS anual de niños por grupo de edad (C.S. César López Silva)</h3>",
+        unsafe_allow_html=True,
     )
 
-    col_et1, col_et2 = st.columns([1.5, 1])
-    with col_et1:
-        anios_etarios = st.multiselect(
-            "Seleccionar Año(s) - Grupos Etarios:",
-            anios_disponibles,
-            default=ultimos_dos_anios,
-            key=f"{key_prefix}_etarios_anios",
+    df_et_sum = (
+        df.groupby("año")[["ira_m2", "ira_2_11", "ira_1_4a"]].sum().reset_index()
+    )
+
+    if not df_et_sum.empty:
+        fig_et = px.bar(
+            df_et_sum,
+            x="año",
+            y=["ira_m2", "ira_2_11", "ira_1_4a"],
+            barmode="stack",
+            template="plotly_dark",
+            labels={
+                "value": "Total de Episodios",
+                "año": "Año",
+                "variable": "Grupo de Edad",
+            },
+            color_discrete_map={
+                "ira_m2": "#0056B3",  # Azul (< de 2 Meses)
+                "ira_2_11": "#D96B00",  # Naranja (2M a 11 Meses)
+                "ira_1_4a": "#8C8C8C",  # Gris (1 a 4 Años)
+            },
         )
 
-    df_et = df[df["año"].isin(anios_etarios)]
-
-    if not df_et.empty:
-        df_et_sum = (
-            df_et.groupby("año")[["ira_m2", "ira_2_11", "ira_1_4a"]]
-            .sum()
-            .reset_index()
-        )
-        df_et_melted = df_et_sum.melt(
-            id_vars=["año"],
-            value_vars=["ira_m2", "ira_2_11", "ira_1_4a"],
-            var_name="Grupo Etario",
-            value_name="Casos",
-        )
-
-        nombres_grupos = {
-            "ira_m2": "< 2 Meses",
-            "ira_2_11": "2 a 11 Meses",
+        nombres_leyenda = {
+            "ira_m2": "< de 2 Meses",
+            "ira_2_11": "2M a 11 Meses",
             "ira_1_4a": "1 a 4 Años",
         }
-        df_et_melted["Grupo Etario"] = df_et_melted["Grupo Etario"].map(
-            nombres_grupos
-        )
-        df_et_melted["año_str"] = df_et_melted["año"].astype(str)
+        for serie in fig_et.data:
+            if serie.name in nombres_leyenda:
+                serie.name = nombres_leyenda[serie.name]
 
-        anios_seleccionados_ordenados = sorted(df_et_sum["año"].unique())
-        colores_base = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
-        mapa_colores = {}
-
-        for idx, anio in enumerate(anios_seleccionados_ordenados):
-            if anio == max(anios_seleccionados_ordenados):
-                mapa_colores[str(anio)] = "#D90429"
-            else:
-                mapa_colores[str(anio)] = colores_base[idx % len(colores_base)]
-
-        fig_et = px.bar(
-            df_et_melted,
-            x="Grupo Etario",
-            y="Casos",
-            color="año_str",
-            barmode="group",
-            text="Casos",
-            template="plotly_dark",
-            labels={"año_str": "Año", "Grupo Etario": "Grupo de Edad"},
-            color_discrete_map=mapa_colores,
-        )
-
-        fig_et.update_traces(textposition="auto", textfont_size=13)
         fig_et.update_layout(
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            height=340,
+            height=450,
             margin=dict(l=10, r=10, t=30, b=10),
+            xaxis=dict(type="category", dtick=1),
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+            ),
         )
 
         st.plotly_chart(
             fig_et, use_container_width=True, config=config_plotly
         )
+
+        # Tabla resumen inferior idéntica a la imagen de referencia
+        df_tabla = df_et_sum.set_index("año").T
+        df_tabla.index = ["< de 2 Meses", "2M a 11 Meses", "1 a 4 Años"]
+        st.markdown(
+            "<p style='font-size:12px; font-weight:bold; color:#00CCFF; margin-bottom:2px;'>REGISTRO NUMÉRICO POR AÑO</p>",
+            unsafe_allow_html=True,
+        )
+        st.dataframe(df_tabla, use_container_width=True)
 
 
 # 6. Función Renderizadora Principal
@@ -663,7 +643,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
 
     st.divider()
 
-    # FILA 2: Evolución Anual & Grupos Etarios / Comparativo (Derecha)
+    # FILA 2: Evolución Anual (Izquierda) & Gráfico de la Derecha según el Módulo
     col_hist, col_right = st.columns([1.8, 1])
 
     with col_hist:
@@ -762,12 +742,11 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # --- LÍNEAS VERTICALES DE CORTE CON NUEVOS COLORES Y TEXTOS COMPLETOS ---
             fig_hist.add_vline(
                 x=anio_inicio_10,
                 line_width=2.5,
                 line_dash="dashdot",
-                line_color="#00E5FF",  # Cian brillante distintivo
+                line_color="#00E5FF",
                 annotation_text="Inicio Út. 10 Años",
                 annotation_position="top left",
                 annotation_font=dict(color="#00E5FF", size=11, weight="bold"),
@@ -777,7 +756,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 x=anio_inicio_5,
                 line_width=2.5,
                 line_dash="dashdot",
-                line_color="#FF9100",  # Naranja brillante distintivo
+                line_color="#FF9100",
                 annotation_text="Inicio Út. 5 Años",
                 annotation_position="top left",
                 annotation_font=dict(color="#FF9100", size=11, weight="bold"),
@@ -884,9 +863,16 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 st.plotly_chart(
                     fig_ult, use_container_width=True, config=config_plotly
                 )
-
         else:
-            renderizar_grafico_grupos_etarios(df, key_prefix)
+            # En IRAS, si gustas puedes mostrar un indicador o dejar espacio, 
+            # pero el gráfico principal de grupos etarios irá abajo como 5to gráfico completo.
+            st.info(
+                "💡 El análisis por grupos etarios detallado se encuentra disponible en la sección inferior como 5to gráfico."
+            )
+
+    # Si estamos en IRAS, renderizamos el 5to gráfico ocupando todo el ancho abajo
+    if key_prefix == "iras":
+        renderizar_quinto_grafico_iras(df)
 
 
 # 7. EJECUCIÓN DEL MÓDULO SELECCIONADO
