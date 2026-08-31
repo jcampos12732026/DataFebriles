@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 2. Estilos CSS con Identidad Institucional MINSA
+# 2. Estilos CSS con Identidad Institucional MINSA y Mejora de Tablas
 st.markdown(
     """
     <style>
@@ -56,6 +56,13 @@ st.markdown(
         border-radius: 4px !important;
         padding: 1px 5px !important;
         font-size: 11px !important;
+    }
+
+    /* Estilo profesional para dataframes en Streamlit */
+    dataframe, [data-testid="stDataFrame"] {
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #0056b3;
     }
     </style>
 """,
@@ -260,7 +267,7 @@ else:
     )
 
 
-# --- 5TO GRÁFICO: GRUPOS ETARIOS APILADOS PROFESIONAL + TABLA (Exclusivo para IRAS) ---
+# --- 5TO GRÁFICO: GRUPOS ETARIOS APILADOS CON ALTO CONTRASTE (ROJO, NARANJA, AZUL) + TABLA ESTILIZADA ---
 def renderizar_quinto_grafico_iras(df):
     cols_iras = ["ira_m2", "ira_2_11", "ira_1_4a"]
     if not all(c in df.columns for c in cols_iras):
@@ -270,12 +277,12 @@ def renderizar_quinto_grafico_iras(df):
     
     st.markdown(
         """
-        <div style="background: linear-gradient(135deg, rgba(0, 34, 68, 0.7), rgba(0, 51, 102, 0.9)); border-left: 5px solid #00CCFF; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px;">
-            <h3 style='color: #00CCFF; margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase;'>
-                👶 Distribución y Comportamiento Histórico por Grupos Etarios (IRAS)
+        <div style="background: linear-gradient(135deg, rgba(0, 34, 68, 0.8), rgba(10, 25, 47, 0.95)); border-left: 5px solid #FF9100; border-top: 1px solid rgba(0, 204, 255, 0.2); border-right: 1px solid rgba(0, 204, 255, 0.2); border-bottom: 1px solid rgba(0, 204, 255, 0.2); padding: 12px 18px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0px 4px 15px rgba(0,0,0,0.3);">
+            <h3 style='color: #00CCFF; margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;'>
+                👶 Distribución Estratificada por Grupos Etarios (IRAS - Menores de 5 Años)
             </h3>
-            <p style='color: #a0aec0; margin: 3px 0 0 0; font-size: 12px;'>
-                Análisis apilado de episodios absolutos en menores de 5 años - C.S. César López Silva
+            <p style='color: #cbd5e1; margin: 4px 0 0 0; font-size: 12px;'>
+                Comportamiento histórico apilado con alto contraste de riesgo clínico - C.S. César López Silva
             </p>
         </div>
         """,
@@ -289,6 +296,7 @@ def renderizar_quinto_grafico_iras(df):
     if not df_et_sum.empty:
         df_et_sum["total_anual"] = df_et_sum["ira_m2"] + df_et_sum["ira_2_11"] + df_et_sum["ira_1_4a"]
 
+        # Paleta de alto contraste profesional: Rojo intenso (máxima vulnerabilidad), Naranja alerta y Azul institucional
         fig_et = px.bar(
             df_et_sum,
             x="año",
@@ -301,14 +309,14 @@ def renderizar_quinto_grafico_iras(df):
                 "variable": "Grupo etario",
             },
             color_discrete_map={
-                "ira_m2": "#004080",    # Azul institucional oscuro (< de 2 Meses)
-                "ira_2_11": "#0088CC",  # Azul cian intermedio (2M a 11 Meses)
-                "ira_1_4a": "#4A90E2",  # Azul claro (1 a 4 Años)
+                "ira_m2": "#D90429",    # Rojo intenso alerta (< de 2 Meses)
+                "ira_2_11": "#FF9100",  # Naranja dinámico (2M a 11 Meses)
+                "ira_1_4a": "#0077B6",  # Azul sólido corporativo (1 a 4 Años)
             },
         )
 
         nombres_leyenda = {
-            "ira_m2": "< de 2 Meses",
+            "ira_m2": "< de 2 Meses (Alto Riesgo)",
             "ira_2_11": "2M a 11 Meses",
             "ira_1_4a": "1 a 4 Años",
         }
@@ -316,6 +324,7 @@ def renderizar_quinto_grafico_iras(df):
             if serie.name in nombres_leyenda:
                 serie.name = nombres_leyenda[serie.name]
 
+        # Etiqueta de total general en la parte superior
         fig_et.add_trace(
             go.Scatter(
                 x=df_et_sum["año"],
@@ -345,8 +354,14 @@ def renderizar_quinto_grafico_iras(df):
             fig_et, use_container_width=True, config={"displayModeBar": "hover"}
         )
 
+        # TABLA ESTILIZADA CON FONDO Y CONTENEDOR PROFESIONAL
         st.markdown(
-            "<p style='font-size:12px; font-weight:bold; color:#00CCFF; margin-top: 15px; margin-bottom:5px; text-transform: uppercase;'>📋 Consolidado Numérico por Grupo Etario y Año</p>",
+            """
+            <div style="background: linear-gradient(135deg, rgba(13, 27, 42, 0.9), rgba(5, 13, 26, 0.95)); padding: 15px; border-radius: 8px; border: 1px solid rgba(0, 119, 182, 0.4); box-shadow: 0 4px 12px rgba(0,0,0,0.4); margin-top: 15px;">
+                <p style='font-size: 13px; font-weight: bold; color: #00CCFF; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px;'>
+                    📋 Consolidado Estadístico Oficial por Grupo Etario y Año (IRAS)
+                </p>
+            """,
             unsafe_allow_html=True,
         )
         
@@ -354,6 +369,8 @@ def renderizar_quinto_grafico_iras(df):
         df_tabla.index = ["< de 2 Meses", "2M a 11 Meses", "1 a 4 Años", "TOTAL GENERAL"]
         
         st.dataframe(df_tabla, use_container_width=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # 6. Función Renderizadora Principal
@@ -892,10 +909,10 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
         else:
             st.info(
-                "💡 El análisis detallado por grupos etarios se encuentra desplegado en la sección inferior como 5to gráfico completo."
+                "💡 El análisis detallado de los grupos etarios se encuentra desplegado en la sección inferior como el 5to gráfico completo."
             )
 
-    # Renderizar el 5to gráfico inferior exclusivo para IRAS
+    # Renderizar el 5to gráfico obligatorio para IRAS
     if key_prefix == "iras":
         renderizar_quinto_grafico_iras(df)
 
