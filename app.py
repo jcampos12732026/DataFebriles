@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
 import os
+from datetime import datetime, timedelta
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -235,6 +235,17 @@ def renderizar_grafico_grupos_etarios(df, key_prefix):
         )
         df_et_melted["año_str"] = df_et_melted["año"].astype(str)
 
+        # Construcción de paleta dinámica estilo Febriles: Azul para años anteriores y Rojo para el año más reciente
+        anios_seleccionados_ordenados = sorted(df_et_sum["año"].unique())
+        colores_base = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
+        mapa_colores = {}
+
+        for idx, anio in enumerate(anios_seleccionados_ordenados):
+            if anio == max(anios_seleccionados_ordenados):
+                mapa_colores[str(anio)] = "#D90429"  # Rojo para el último año
+            else:
+                mapa_colores[str(anio)] = colores_base[idx % len(colores_base)]
+
         fig_et = px.bar(
             df_et_melted,
             x="Grupo Etario",
@@ -244,7 +255,7 @@ def renderizar_grafico_grupos_etarios(df, key_prefix):
             text="Casos",
             template="plotly_dark",
             labels={"año_str": "Año", "Grupo Etario": "Grupo de Edad"},
-            color_discrete_sequence=["#0056B3", "#00CCFF", "#D90429"],
+            color_discrete_map=mapa_colores,
         )
 
         fig_et.update_traces(textposition="auto", textfont_size=13)
@@ -783,7 +794,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
 
         else:
-            # En el módulo IRAS se renderiza Grupos Etarios abajo a la derecha
             renderizar_grafico_grupos_etarios(df, key_prefix)
 
 
