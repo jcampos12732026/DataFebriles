@@ -543,7 +543,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
     st.divider()
 
     # ==========================================
-    # FILA 2: Evolución Anual Suavizada con Promedios y Líneas Verticales
+    # FILA 2: Evolución Anual Suavizada con Relleno Profesional y Sin Grid Horizontal
     # ==========================================
     col_hist, col_right = st.columns([1.8, 1])
 
@@ -561,10 +561,9 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             anio_max_total = int(df_totales_anuales["año"].max())
             anios_totales_ord = sorted(df_totales_anuales["año"].unique())
 
-            # 1. Promedio Histórico Total
+            # Promedios
             promedio_total = df_totales_anuales["casos_totales"].mean()
 
-            # 2. Promedio Últimos 10 Años
             ultimos_10 = anios_totales_ord[-10:]
             df_10 = df_totales_anuales[
                 df_totales_anuales["año"].isin(ultimos_10)
@@ -572,7 +571,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             promedio_10_anios = df_10["casos_totales"].mean()
             anio_inicio_10 = int(min(ultimos_10))
 
-            # 3. Promedio Últimos 5 Años
             ultimos_5 = anios_totales_ord[-5:]
             df_5 = df_totales_anuales[df_totales_anuales["año"].isin(ultimos_5)]
             promedio_5_anios = df_5["casos_totales"].mean()
@@ -580,7 +578,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
 
             fig_hist = go.Figure()
 
-            # 1. Casos Anuales (Línea Principal Suavizada con Curva 'spline')
+            # 1. Casos Anuales (Curva Suavizada Spline + Relleno Profesional Degradado Naranja High-Contrast)
             fig_hist.add_trace(
                 go.Scatter(
                     x=df_totales_anuales["año"],
@@ -589,71 +587,77 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     name="Casos Anuales",
                     text=df_totales_anuales["casos_totales"],
                     textposition="top center",
-                    textfont=dict(size=11, color="#ffffff", weight="bold"),
+                    textfont=dict(size=12, color="#ffffff", weight="bold"),
+                    fill="tozeroy",
+                    fillcolor="rgba(255, 102, 0, 0.22)",  # Sombreado elegante y cálido
                     line=dict(
-                        shape="spline", smoothing=1.3, width=3.5, color="#ff7f0e"
+                        shape="spline",
+                        smoothing=1.3,
+                        width=4,
+                        color="#FF6600",  # Naranja Vivo de Alto Contraste
                     ),
-                    marker=dict(size=7, color="#ff7f0e"),
+                    marker=dict(
+                        size=9,
+                        color="#FFFFFF",
+                        line=dict(width=3, color="#FF6600"),
+                    ),
                 )
             )
 
-            # 2. Promedio Histórico Total (Desde el año más antiguo al actual)
+            # 2. Promedio Histórico Total (Cyan Neón Intenso)
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
                     y=[promedio_total, promedio_total],
                     mode="lines",
                     name=f"Prom. Histórico Total ({int(promedio_total):,})",
-                    line=dict(color="#00ffff", width=2, dash="dash"),
+                    line=dict(color="#00F0FF", width=2.5, dash="dash"),
                 )
             )
 
-            # 3. Promedio Últimos 10 Años (Desde el año más antiguo al actual)
+            # 3. Promedio Últimos 10 Años (Amarillo Neón Puro)
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
                     y=[promedio_10_anios, promedio_10_anios],
                     mode="lines",
                     name=f"Prom. Últimos 10 Años ({int(promedio_10_anios):,})",
-                    line=dict(color="#ffcc00", width=2.5, dash="dot"),
+                    line=dict(color="#FFEA00", width=3, dash="dot"),
                 )
             )
 
-            # 4. Promedio Últimos 5 Años (Desde el año más antiguo al actual)
+            # 4. Promedio Últimos 5 Años (Verde Neón Brillante)
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
                     y=[promedio_5_anios, promedio_5_anios],
                     mode="lines",
                     name=f"Prom. Últimos 5 Años ({int(promedio_5_anios):,})",
-                    line=dict(color="#00ff66", width=2.5, dash="solid"),
+                    line=dict(color="#00FF66", width=3, dash="solid"),
                 )
             )
 
-            # 5. LÍNEAS VERTICALES DE GRUPOS DE AÑOS
-            # Línea vertical para el inicio de los últimos 10 años
+            # 5. Líneas Verticales Indicadoras de Grupos
             fig_hist.add_vline(
                 x=anio_inicio_10,
                 line_width=2,
                 line_dash="dashdot",
-                line_color="#ffcc00",
+                line_color="#FFEA00",
                 annotation_text="Inicio U10A",
                 annotation_position="top left",
-                annotation_font=dict(color="#ffcc00", size=10),
+                annotation_font=dict(color="#FFEA00", size=11, weight="bold"),
             )
 
-            # Línea vertical para el inicio de los últimos 5 años
             fig_hist.add_vline(
                 x=anio_inicio_5,
                 line_width=2,
                 line_dash="dashdot",
-                line_color="#00ff66",
+                line_color="#00FF66",
                 annotation_text="Inicio U5A",
                 annotation_position="top left",
-                annotation_font=dict(color="#00ff66", size=10),
+                annotation_font=dict(color="#00FF66", size=11, weight="bold"),
             )
 
-            # Margen dinámico superior para garantizar que las etiquetas del valor de datos no se corten
             max_valor_y = max(
                 df_totales_anuales["casos_totales"].max(),
                 promedio_total,
@@ -668,10 +672,18 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                height=370,
+                height=380,
                 margin=dict(l=10, r=10, t=50, b=10),
-                xaxis=dict(type="linear", dtick=1, tickformat="d"),
-                yaxis=dict(range=[0, max_valor_y * 1.28]),
+                # SE ELIMINA LA CUADRÍCULA HORIZONTAL (showgrid=False)
+                yaxis=dict(
+                    range=[0, max_valor_y * 1.28],
+                    showgrid=False,
+                    zeroline=True,
+                    zerolinecolor="rgba(255,255,255,0.2)",
+                ),
+                xaxis=dict(
+                    type="linear", dtick=1, tickformat="d", showgrid=False
+                ),
                 legend=dict(
                     orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
                 ),
@@ -734,7 +746,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             fig_ult.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                height=370,
+                height=380,
                 margin=dict(l=10, r=10, t=50, b=10),
             )
             st.plotly_chart(
