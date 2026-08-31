@@ -371,6 +371,10 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             df_sem = df_sem.sort_values(by="semana")
             colores_lineas = ["#0088CC", "#4A90E2", "#6C757D"]
 
+            # Aplicar filtro de recorte acumulado al gráfico semanal si está activo
+            if incluye_anio_actual_g1 and corte_acumulado_g1:
+                df_sem = df_sem[df_sem["semana"] <= max_semana_real_data]
+
             # 1. Años anteriores como líneas suavizadas
             idx_linea = 0
             for anio in anios_en_datos:
@@ -400,11 +404,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
 
             # 2. Último año presente en la data como línea suavizada destacada (roja, con marcadores y etiquetas)
             if max_anio_presente in anios_en_datos:
-                df_ultimo = df_sem[df_sem["año"] == max_anio_presente].copy()
-                if corte_acumulado_g1:
-                    df_ultimo = df_ultimo[
-                        df_ultimo["semana"] <= max_semana_real_data
-                    ]
+                df_ultimo = df_sem[df_sem["año"] == max_anio_presente]
 
                 fig_sem.add_trace(
                     go.Scatter(
