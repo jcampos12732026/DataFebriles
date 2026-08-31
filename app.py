@@ -58,7 +58,6 @@ st.markdown(
         font-size: 11px !important;
     }
 
-    /* Estilo profesional para dataframes en Streamlit */
     dataframe, [data-testid="stDataFrame"] {
         border-radius: 8px;
         overflow: hidden;
@@ -162,7 +161,7 @@ config_plotly = {"displayModeBar": "hover"}
 hoy = datetime.now()
 semana_epidemiologica_actual = obtener_semana_epidemiologica(hoy)
 
-df = cargar_data_iras = cargar_datos_iras()
+df = cargar_datos_iras()
 
 # --- BARRA LATERAL EXCLUSIVA IRAS ---
 with st.sidebar:
@@ -274,20 +273,6 @@ else:
     )
     max_mes_num_real_data = max(1, min(12, max_mes_num_real_data))
 
-    orden_meses = [
-        "Enero",
-        "Feb",
-        "Marzo",
-        "Abril",
-        "Mayo",
-        "Junio",
-        "Julio",
-        "Agosto",
-        "Setiembre",
-        "Octubre",
-        "Noviembre",
-        "Diciembre",
-    ]
     max_mes_nombre_real_data = [
         "Enero",
         "Febrero",
