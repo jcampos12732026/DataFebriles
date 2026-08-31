@@ -1,3 +1,403 @@
+import os
+from datetime import datetime, timedelta
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
+# 1. Configuración de página
+st.set_page_config(
+    page_title="Sala Situacional Epidemiológica - C.S. César López Silva",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# 2. Estilos CSS con Identidad Institucional MINSA
+st.markdown(
+    """
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    div[data-testid="stStatusWidget"] {visibility: hidden;}
+
+    .stApp {
+        background: radial-gradient(ellipse at bottom, #0d1b2a 0%, #080d1a 100%);
+        color: #ffffff;
+    }
+
+    .block-container {
+        padding-top: 2.5rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        max-width: 100% !important;
+    }
+
+    [data-testid="stSidebar"] {
+        width: 290px !important;
+        min-width: 290px !important;
+        background-color: #060a12 !important;
+    }
+
+    .unified-card-header {
+        background: linear-gradient(145deg, #002244, #003366);
+        border: 2px solid #0056b3;
+        border-radius: 10px;
+        padding: 14px 10px;
+        text-align: center;
+        box-shadow: 0px 4px 12px rgba(0, 86, 179, 0.4);
+        margin-bottom: 15px;
+        margin-top: 10px;
+    }
+
+    span[data-baseweb="tag"] {
+        background-color: #d90429 !important;
+        border-radius: 4px !important;
+        padding: 1px 5px !important;
+        font-size: 11px !important;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
+
+# 3. Función para calcular la Semana Epidemiológica
+def obtener_semana_epidemiologica(fecha):
+    primer_dia = datetime(fecha.year, 1, 1)
+    dias_hasta_domingo = (6 - primer_dia.weekday()) % 7
+    primer_domingo = primer_dia + timedelta(days=dias_hasta_domingo)
+
+    if fecha < primer_domingo:
+        return obtener_semana_epidemiologica(datetime(fecha.year - 1, 12, 31))
+
+    dias_transcurridos = (fecha - primer_domingo).days
+    semana = (dias_transcurridos // 7) + 1
+    return semana
+
+
+meses_nombre = {
+    1: "Enero",
+    2: "Febrero",
+    3: "Marzo",
+    4: "Abril",
+    5: "Mayo",
+    6: "Junio",
+    7: "Julio",
+    8: "Agosto",
+    9: "Setiembre",
+    10: "Octubre",
+    11: "Noviembre",
+    12: "Diciembre",
+}
+
+
+# 4. Carga y procesamiento de datos
+def cargar_datos_csv(nombre_archivo, col_total_casos=None):
+    if not os.path.exists(nombre_archivo):
+        return None
+    df = pd.read_csv(nombre_archivo)
+    df.columns = df.columns.str.strip().str.lower()
+
+    if "ano" in df.columns:
+        df = df.rename(columns={"ano": "año"})
+
+    cols_iras = ["ira_m2", "ira_2_11", "ira_1_4a"]
+    tiene_cols_iras = all(col in df.columns for col in cols_iras)
+
+    if tiene_cols_iras:
+        for col in cols_iras:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+        df["casos_totales"] = df["ira_m2"] + df["ira_2_11"] + df["ira_1_4a"]
+    else:
+        if col_total_casos and col_total_casos in df.columns:
+            target_col = col_total_casos
+        else:
+            posibles_cols = [
+                c
+                for c in df.columns
+                if "tot" in c or "feb" in c or "casos" in c or "num" in c
+            ]
+            target_col = posibles_cols[0] if posibles_cols else df.columns[-1]
+
+        df[target_col] = pd.to_numeric(df[target_col], errors="coerce").fillna(
+            0
+        )
+        df["casos_totales"] = df[target_col]
+
+    cols_a_convertir = ["semana", "año", "mes"]
+    for col in cols_a_convertir:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    df["año"] = df["año"].astype(int)
+    df["semana"] = df["semana"].astype(int)
+
+    if "mes" in df.columns:
+        df["mes_num"] = df["mes"].astype(int)
+        df["mes_nom"] = df["mes_num"].map(meses_nombre).fillna("Desconocido")
+    elif "fecha" in df.columns:
+        df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+        df["mes_num"] = df["fecha"].dt.month
+        df["mes_nom"] = df["mes_num"].map(meses_nombre).fillna("Desconocido")
+    else:
+        df["mes_num"] = (
+            ((df["semana"] - 1) // 4.33 + 1).astype(int).clip(1, 12)
+        )
+        df["mes_nom"] = df["mes_num"].map(meses_nombre)
+
+    return df
+
+
+config_plotly = {"displayModeBar": "hover"}
+hoy = datetime.now()
+semana_epidemiologica_actual = obtener_semana_epidemiologica(hoy)
+
+
+# --- BARRA LATERAL UNIFICADA ---
+with st.sidebar:
+    st.markdown(
+        "<h4 style='color:#ffffff; font-size: 14px; font-weight: bold; margin-bottom: 5px;'>📡 Evento Epidemiológico</h4>",
+        unsafe_allow_html=True,
+    )
+
+    # Único selector de módulo
+    modulo_seleccionado = st.radio(
+        "Seleccionar Módulo:",
+        ["🌡️ Febriles", "🫁 IRAS", "🦟 Dengue (Próximamente)"],
+        index=0,
+        key="radio_modulo_unico",
+        label_visibility="collapsed",
+    )
+
+# Carga de datos previa para calcular brecha según el módulo seleccionado
+if "Febriles" in modulo_seleccionado:
+    df_actual_temp = cargar_datos_csv(
+        "febriles_consolidado.csv", col_total_casos="feb_tot"
+    )
+    titulo_evento_temp = "Febriles"
+elif "IRAS" in modulo_seleccionado:
+    df_actual_temp = cargar_datos_csv("iras_consolidado.csv")
+    if df_actual_temp is None and os.path.exists("iras.csv"):
+        df_actual_temp = cargar_datos_csv("iras.csv")
+    titulo_evento_temp = "IRAS"
+else:
+    df_actual_temp = None
+    titulo_evento_temp = "Dengue"
+
+# Cálculo de la brecha
+if (
+    df_actual_temp is not None
+    and not df_actual_temp.empty
+    and "año" in df_actual_temp.columns
+):
+    max_anio_data_t = int(df_actual_temp["año"].max())
+    df_max_anio_t = df_actual_temp[df_actual_temp["año"] == max_anio_data_t]
+    df_con_casos_t = df_max_anio_t[df_max_anio_t["casos_totales"] > 0]
+    if not df_con_casos_t.empty and pd.notna(df_con_casos_t["semana"].max()):
+        max_semana_real_t = int(df_con_casos_t["semana"].max())
+    else:
+        max_semana_v = (
+            df_max_anio_t["semana"].max() if not df_max_anio_t.empty else 1
+        )
+        max_semana_real_t = int(max_semana_v) if pd.notna(max_semana_v) else 1
+    brecha_semanas_t = semana_epidemiologica_actual - max_semana_real_t
+else:
+    max_anio_data_t = hoy.year
+    max_semana_real_t = semana_epidemiologica_actual
+    brecha_semanas_t = 0
+
+
+# Renderizado de Tarjetas Informativas en la Barra Lateral
+with st.sidebar:
+    st.markdown(
+        f"""
+        <div class="unified-card-header">
+            <h4 style="margin:0; color:#00CCFF; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Actual</h4>
+            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">SE {semana_epidemiologica_actual}</h1>
+            <p style="margin:4px 0 0 0; color:#ffffff; font-size: 16px; font-weight: 700;">Año: {hoy.year}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if brecha_semanas_t > 0:
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, rgba(61, 12, 17, 0.95), rgba(92, 29, 36, 0.95)); border-left: 5px solid #D90429; border-radius: 6px; padding: 12px 14px; margin-bottom: 15px; box-shadow: 0px 4px 15px rgba(217, 4, 4, 0.25);">
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 14px; margin-right: 6px;">⚠️</span>
+                    <h4 style="margin: 0; color: #ff8093; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Brecha ({titulo_evento_temp})</h4>
+                </div>
+                <p style="margin: 0; color: #f1f1f1; font-size: 11px; line-height: 1.4;">
+                    SE actual: <b>{semana_epidemiologica_actual}</b><br>
+                    Último registro: <b>SE {max_semana_real_t}</b> ({max_anio_data_t})<br>
+                    Desfase: <b style="color: #ff8093;">{brecha_semanas_t} semana(s)</b>
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, rgba(10, 51, 26, 0.95), rgba(17, 92, 42, 0.95)); border-left: 5px solid #00FF66; border-radius: 6px; padding: 12px 14px; margin-bottom: 15px; box-shadow: 0px 4px 15px rgba(0, 255, 102, 0.2);">
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 14px; margin-right: 6px;">✅</span>
+                    <h4 style="margin: 0; color: #80ffb2; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Sincronizado ({titulo_evento_temp})</h4>
+                </div>
+                <p style="margin: 0; color: #f1f1f1; font-size: 11px; line-height: 1.4;">
+                    Información al día en <b>SE {max_semana_real_t}</b> del período {max_anio_data_t}.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+# --- CABECERA PRINCIPAL ---
+if os.path.exists("logo_minsa.png"):
+    st.image("logo_minsa.png", use_container_width=True)
+else:
+    st.markdown(
+        '<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px; margin-bottom: 10px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def renderizar_grafico_grupos_etarios(df, key_prefix):
+    cols_iras = ["ira_m2", "ira_2_11", "ira_1_4a"]
+    if not all(c in df.columns for c in cols_iras):
+        return
+
+    st.subheader("👶 Distribución por Grupos Etarios (< 5 Años)")
+
+    anios_disponibles = sorted(df["año"].unique())
+    ultimos_dos_anios = (
+        anios_disponibles[-2:]
+        if len(anios_disponibles) >= 2
+        else anios_disponibles
+    )
+
+    col_et1, col_et2 = st.columns([1.5, 1])
+    with col_et1:
+        anios_etarios = st.multiselect(
+            "Seleccionar Año(s) - Grupos Etarios:",
+            anios_disponibles,
+            default=ultimos_dos_anios,
+            key=f"{key_prefix}_etarios_anios",
+        )
+
+    df_et = df[df["año"].isin(anios_etarios)]
+
+    if not df_et.empty:
+        df_et_sum = (
+            df_et.groupby("año")[["ira_m2", "ira_2_11", "ira_1_4a"]]
+            .sum()
+            .reset_index()
+        )
+        df_et_melted = df_et_sum.melt(
+            id_vars=["año"],
+            value_vars=["ira_m2", "ira_2_11", "ira_1_4a"],
+            var_name="Grupo Etario",
+            value_name="Casos",
+        )
+
+        nombres_grupos = {
+            "ira_m2": "< 2 Meses",
+            "ira_2_11": "2 a 11 Meses",
+            "ira_1_4a": "1 a 4 Años",
+        }
+        df_et_melted["Grupo Etario"] = df_et_melted["Grupo Etario"].map(
+            nombres_grupos
+        )
+        df_et_melted["año_str"] = df_et_melted["año"].astype(str)
+
+        anios_seleccionados_ordenados = sorted(df_et_sum["año"].unique())
+        colores_base = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
+        mapa_colores = {}
+
+        for idx, anio in enumerate(anios_seleccionados_ordenados):
+            if anio == max(anios_seleccionados_ordenados):
+                mapa_colores[str(anio)] = "#D90429"
+            else:
+                mapa_colores[str(anio)] = colores_base[idx % len(colores_base)]
+
+        fig_et = px.bar(
+            df_et_melted,
+            x="Grupo Etario",
+            y="Casos",
+            color="año_str",
+            barmode="group",
+            text="Casos",
+            template="plotly_dark",
+            labels={"año_str": "Año", "Grupo Etario": "Grupo de Edad"},
+            color_discrete_map=mapa_colores,
+        )
+
+        fig_et.update_traces(textposition="auto", textfont_size=13)
+        fig_et.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=340,
+            margin=dict(l=10, r=10, t=30, b=10),
+        )
+
+        st.plotly_chart(
+            fig_et, use_container_width=True, config=config_plotly
+        )
+
+
+# 6. Función Renderizadora Principal
+def renderizar_dashboard(df, titulo_evento, key_prefix):
+    if df.empty or "año" not in df.columns:
+        st.warning(
+            f"⚠️ El conjunto de datos de {titulo_evento} está vacío o no tiene la columna 'año'."
+        )
+        return
+
+    max_anio_data = int(df["año"].max())
+    df_max_anio = df[df["año"] == max_anio_data]
+    df_con_casos = df_max_anio[df_max_anio["casos_totales"] > 0]
+
+    if not df_con_casos.empty and pd.notna(df_con_casos["semana"].max()):
+        max_semana_real_data = int(df_con_casos["semana"].max())
+    else:
+        max_semana_val = (
+            df_max_anio["semana"].max() if not df_max_anio.empty else 1
+        )
+        max_semana_real_data = (
+            int(max_semana_val) if pd.notna(max_semana_val) else 1
+        )
+
+    if not df_con_casos.empty and pd.notna(df_con_casos["mes_num"].max()):
+        max_mes_num_real_data = int(df_con_casos["mes_num"].max())
+    else:
+        max_mes_val = (
+            df_max_anio["mes_num"].max() if not df_max_anio.empty else 1
+        )
+        max_mes_num_real_data = (
+            int(max_mes_val) if pd.notna(max_mes_val) else 1
+        )
+
+    max_mes_num_real_data = max(1, min(12, max_mes_num_real_data))
+
+    orden_meses = [
+        "Enero",
+        "Febrero",
+        "Marzo",
+        "Abril",
+        "Mayo",
+        "Junio",
+        "Julio",
+        "Agosto",
+        "Setiembre",
+        "Octubre",
+        "Noviembre",
+        "Diciembre",
+    ]
+    max_mes_nombre_real_data = orden_meses[max_mes_num_real_data - 1]
 
     anios_disponibles = sorted(df["año"].unique())
     ultimos_dos_anios = (
