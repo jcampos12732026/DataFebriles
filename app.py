@@ -48,6 +48,7 @@ st.markdown(
         text-align: center;
         box-shadow: 0px 4px 12px rgba(0, 86, 179, 0.4);
         margin-bottom: 15px;
+        margin-top: 10px;
     }
 
     span[data-baseweb="tag"] {
@@ -153,25 +154,30 @@ config_plotly = {"displayModeBar": "hover"}
 hoy = datetime.now()
 semana_epidemiologica_actual = obtener_semana_epidemiologica(hoy)
 
-# 5. Detección previa del evento activo para calcular la brecha en la barra lateral
-modulo_seleccionado_temp = st.sidebar.radio(
-    "Seleccionar Módulo (Temp):",
-    ["🌡️ Febriles", "🫁 IRAS", "🦟 Dengue (Próximamente)"],
-    index=0,
-    key="temp_radio_modulo",
-)
 
-# Volvemos a instanciar el radio oficial limpio limpiando el temporal visual mediante lógica
-# (Para mantener orden, estructuraremos la barra lateral de forma definitiva abajo)
-st.sidebar.empty()
+# --- BARRA LATERAL UNIFICADA ---
+with st.sidebar:
+    st.markdown(
+        "<h4 style='color:#ffffff; font-size: 14px; font-weight: bold; margin-bottom: 5px;'>📡 Evento Epidemiológico</h4>",
+        unsafe_allow_html=True,
+    )
 
-# Limpiamos y cargamos el DF según el módulo seleccionado para calcular los indicadores de brecha
-if "Febriles" in modulo_seleccionado_temp:
+    # Único selector de módulo
+    modulo_seleccionado = st.radio(
+        "Seleccionar Módulo:",
+        ["🌡️ Febriles", "🫁 IRAS", "🦟 Dengue (Próximamente)"],
+        index=0,
+        key="radio_modulo_unico",
+        label_visibility="collapsed",
+    )
+
+# Carga de datos previa para calcular brecha según el módulo seleccionado
+if "Febriles" in modulo_seleccionado:
     df_actual_temp = cargar_datos_csv(
         "febriles_consolidado.csv", col_total_casos="feb_tot"
     )
     titulo_evento_temp = "Febriles"
-elif "IRAS" in modulo_seleccionado_temp:
+elif "IRAS" in modulo_seleccionado:
     df_actual_temp = cargar_datos_csv("iras_consolidado.csv")
     if df_actual_temp is None and os.path.exists("iras.csv"):
         df_actual_temp = cargar_datos_csv("iras.csv")
@@ -180,8 +186,12 @@ else:
     df_actual_temp = None
     titulo_evento_temp = "Dengue"
 
-# Cálculo de la brecha para la barra lateral
-if df_actual_temp is not None and not df_actual_temp.empty and "año" in df_actual_temp.columns:
+# Cálculo de la brecha
+if (
+    df_actual_temp is not None
+    and not df_actual_temp.empty
+    and "año" in df_actual_temp.columns
+):
     max_anio_data_t = int(df_actual_temp["año"].max())
     df_max_anio_t = df_actual_temp[df_actual_temp["año"] == max_anio_data_t]
     df_con_casos_t = df_max_anio_t[df_max_anio_t["casos_totales"] > 0]
@@ -199,7 +209,7 @@ else:
     brecha_semanas_t = 0
 
 
-# --- BARRA LATERAL DEFINITIVA ---
+# Renderizado de Tarjetas Informativas en la Barra Lateral
 with st.sidebar:
     st.markdown(
         f"""
@@ -212,7 +222,6 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # --- ALERTA INSTITUCIONAL DE BRECHA EPIDEMIOLÓGICA (UBICACIÓN LATERAL) ---
     if brecha_semanas_t > 0:
         st.markdown(
             f"""
@@ -246,17 +255,6 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-    st.markdown(
-        "<h4 style='color:#ffffff; font-size: 14px; margin-top: 10px; font-weight: bold;'>📡 Evento Epidemiológico</h4>",
-        unsafe_allow_html=True,
-    )
-
-    modulo_seleccionado = st.radio(
-        "Seleccionar Módulo:",
-        ["🌡️ Febriles", "🫁 IRAS", "🦟 Dengue (Próximamente)"],
-        index=0 if "Febriles" in modulo_seleccionado_temp else 1,
-        key="radio_modulo_definitivo",
-    )
 
 # --- CABECERA PRINCIPAL ---
 if os.path.exists("logo_minsa.png"):
@@ -890,7 +888,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             renderizar_grafico_grupos_etarios(df, key_prefix)
 
 
-# 7. NAVEGACIÓN Y CONTROL DE MÓDULOS (EJECUCIÓN)
+# 7. EJECUCIÓN DEL MÓDULO SELECCIONADO
 if modulo_seleccionado == "🌡️ Febriles":
     df = cargar_datos_csv("febriles_consolidado.csv", col_total_casos="feb_tot")
     if df is None:
