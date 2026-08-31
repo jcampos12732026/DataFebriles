@@ -5,6 +5,19 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+# Ocultar barra superior, menú y pie de página
+st.markdown(
+    """
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    div[data-testid="stStatusWidget"] {visibility: hidden;}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # Configuración de página
 st.set_page_config(
     page_title="Sala Situacional - Febriles",
