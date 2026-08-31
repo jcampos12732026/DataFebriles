@@ -153,7 +153,53 @@ config_plotly = {"displayModeBar": "hover"}
 hoy = datetime.now()
 semana_epidemiologica_actual = obtener_semana_epidemiologica(hoy)
 
-# --- BARRA LATERAL ---
+# 5. Detección previa del evento activo para calcular la brecha en la barra lateral
+modulo_seleccionado_temp = st.sidebar.radio(
+    "Seleccionar Módulo (Temp):",
+    ["🌡️ Febriles", "🫁 IRAS", "🦟 Dengue (Próximamente)"],
+    index=0,
+    key="temp_radio_modulo",
+)
+
+# Volvemos a instanciar el radio oficial limpio limpiando el temporal visual mediante lógica
+# (Para mantener orden, estructuraremos la barra lateral de forma definitiva abajo)
+st.sidebar.empty()
+
+# Limpiamos y cargamos el DF según el módulo seleccionado para calcular los indicadores de brecha
+if "Febriles" in modulo_seleccionado_temp:
+    df_actual_temp = cargar_datos_csv(
+        "febriles_consolidado.csv", col_total_casos="feb_tot"
+    )
+    titulo_evento_temp = "Febriles"
+elif "IRAS" in modulo_seleccionado_temp:
+    df_actual_temp = cargar_datos_csv("iras_consolidado.csv")
+    if df_actual_temp is None and os.path.exists("iras.csv"):
+        df_actual_temp = cargar_datos_csv("iras.csv")
+    titulo_evento_temp = "IRAS"
+else:
+    df_actual_temp = None
+    titulo_evento_temp = "Dengue"
+
+# Cálculo de la brecha para la barra lateral
+if df_actual_temp is not None and not df_actual_temp.empty and "año" in df_actual_temp.columns:
+    max_anio_data_t = int(df_actual_temp["año"].max())
+    df_max_anio_t = df_actual_temp[df_actual_temp["año"] == max_anio_data_t]
+    df_con_casos_t = df_max_anio_t[df_max_anio_t["casos_totales"] > 0]
+    if not df_con_casos_t.empty and pd.notna(df_con_casos_t["semana"].max()):
+        max_semana_real_t = int(df_con_casos_t["semana"].max())
+    else:
+        max_semana_v = (
+            df_max_anio_t["semana"].max() if not df_max_anio_t.empty else 1
+        )
+        max_semana_real_t = int(max_semana_v) if pd.notna(max_semana_v) else 1
+    brecha_semanas_t = semana_epidemiologica_actual - max_semana_real_t
+else:
+    max_anio_data_t = hoy.year
+    max_semana_real_t = semana_epidemiologica_actual
+    brecha_semanas_t = 0
+
+
+# --- BARRA LATERAL DEFINITIVA ---
 with st.sidebar:
     st.markdown(
         f"""
@@ -166,6 +212,40 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+    # --- ALERTA INSTITUCIONAL DE BRECHA EPIDEMIOLÓGICA (UBICACIÓN LATERAL) ---
+    if brecha_semanas_t > 0:
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, rgba(61, 12, 17, 0.95), rgba(92, 29, 36, 0.95)); border-left: 5px solid #D90429; border-radius: 6px; padding: 12px 14px; margin-bottom: 15px; box-shadow: 0px 4px 15px rgba(217, 4, 4, 0.25);">
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 14px; margin-right: 6px;">⚠️</span>
+                    <h4 style="margin: 0; color: #ff8093; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Brecha ({titulo_evento_temp})</h4>
+                </div>
+                <p style="margin: 0; color: #f1f1f1; font-size: 11px; line-height: 1.4;">
+                    SE actual: <b>{semana_epidemiologica_actual}</b><br>
+                    Último registro: <b>SE {max_semana_real_t}</b> ({max_anio_data_t})<br>
+                    Desfase: <b style="color: #ff8093;">{brecha_semanas_t} semana(s)</b>
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, rgba(10, 51, 26, 0.95), rgba(17, 92, 42, 0.95)); border-left: 5px solid #00FF66; border-radius: 6px; padding: 12px 14px; margin-bottom: 15px; box-shadow: 0px 4px 15px rgba(0, 255, 102, 0.2);">
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 14px; margin-right: 6px;">✅</span>
+                    <h4 style="margin: 0; color: #80ffb2; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Sincronizado ({titulo_evento_temp})</h4>
+                </div>
+                <p style="margin: 0; color: #f1f1f1; font-size: 11px; line-height: 1.4;">
+                    Información al día en <b>SE {max_semana_real_t}</b> del período {max_anio_data_t}.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     st.markdown(
         "<h4 style='color:#ffffff; font-size: 14px; margin-top: 10px; font-weight: bold;'>📡 Evento Epidemiológico</h4>",
         unsafe_allow_html=True,
@@ -174,7 +254,8 @@ with st.sidebar:
     modulo_seleccionado = st.radio(
         "Seleccionar Módulo:",
         ["🌡️ Febriles", "🫁 IRAS", "🦟 Dengue (Próximamente)"],
-        index=0,
+        index=0 if "Febriles" in modulo_seleccionado_temp else 1,
+        key="radio_modulo_definitivo",
     )
 
 # --- CABECERA PRINCIPAL ---
@@ -270,7 +351,7 @@ def renderizar_grafico_grupos_etarios(df, key_prefix):
         )
 
 
-# 5. Función Renderizadora Principal
+# 6. Función Renderizadora Principal
 def renderizar_dashboard(df, titulo_evento, key_prefix):
     if df.empty or "año" not in df.columns:
         st.warning(
@@ -374,7 +455,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             if incluye_anio_actual_g1 and corte_acumulado_g1:
                 df_sem = df_sem[df_sem["semana"] <= max_semana_real_data]
 
-            # 1. Años anteriores como BARRAS agrupadas limpias
             idx_barra = 0
             for anio in anios_en_datos:
                 if anio != max_anio_presente:
@@ -395,7 +475,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     )
                     idx_barra += 1
 
-            # 2. Último año presente como LÍNEA SUAVIZADA combinada
             if max_anio_presente in anios_en_datos:
                 df_ultimo = df_sem[df_sem["año"] == max_anio_presente]
 
@@ -586,7 +665,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
 
     st.divider()
 
-    # FILA 2: Evolución Anual & Panel Izquierdo Inferior (Brecha) / Grupos Etarios (Derecha)
+    # FILA 2: Evolución Anual & Grupos Etarios / Comparativo (Derecha)
     col_hist, col_right = st.columns([1.8, 1])
 
     with col_hist:
@@ -741,39 +820,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 fig_hist, use_container_width=True, config=config_plotly
             )
 
-        # --- ALERTA INSTITUCIONAL DE BRECHA EPIDEMIOLÓGICA (IZQUIERDA INFERIOR) ---
-        brecha_semanas = semana_epidemiologica_actual - max_semana_real_data
-        if brecha_semanas > 0:
-            st.markdown(
-                f"""
-                <div style="background: linear-gradient(135deg, rgba(61, 12, 17, 0.95), rgba(92, 29, 36, 0.95)); border-left: 5px solid #D90429; border-radius: 6px; padding: 14px 18px; margin-top: 15px; box-shadow: 0px 4px 15px rgba(217, 4, 4, 0.25);">
-                    <div style="display: flex; align-items: center; margin-bottom: 6px;">
-                        <span style="font-size: 16px; margin-right: 8px;">⚠️</span>
-                        <h4 style="margin: 0; color: #ff8093; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Monitoreo de Brecha de Información ({titulo_evento})</h4>
-                    </div>
-                    <p style="margin: 0; color: #f1f1f1; font-size: 13px; line-height: 1.5;">
-                        Nos encontramos transitando la <b>Semana Epidemiológica N° {semana_epidemiologica_actual}</b> del año actual; sin embargo, el sistema registra consolidación oficial de datos únicamente hasta la <b>Semana N° {max_semana_real_data}</b> ({max_anio_data}). Se identifica un desfase operativo pendiente de <b>{brecha_semanas} semana(s)</b> por sincronizar en la base de datos.
-                    </p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f"""
-                <div style="background: linear-gradient(135deg, rgba(10, 51, 26, 0.95), rgba(17, 92, 42, 0.95)); border-left: 5px solid #00FF66; border-radius: 6px; padding: 14px 18px; margin-top: 15px; box-shadow: 0px 4px 15px rgba(0, 255, 102, 0.2);">
-                    <div style="display: flex; align-items: center; margin-bottom: 6px;">
-                        <span style="font-size: 16px; margin-right: 8px;">✅</span>
-                        <h4 style="margin: 0; color: #80ffb2; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Sincronización al 100% ({titulo_evento})</h4>
-                    </div>
-                    <p style="margin: 0; color: #f1f1f1; font-size: 13px; line-height: 1.5;">
-                        La carga de información se encuentra plenamente al día. Estando en la <b>Semana Epidemiológica N° {semana_epidemiologica_actual}</b>, los registros de datos alcanzan de manera óptima hasta la <b>Semana N° {max_semana_real_data}</b> del período {max_anio_data}.
-                    </p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
     with col_right:
         if key_prefix == "febriles":
             st.subheader("📈 Comparativo Últimas Semanas")
@@ -844,7 +890,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             renderizar_grafico_grupos_etarios(df, key_prefix)
 
 
-# 6. NAVEGACIÓN Y CONTROL DE MÓDULOS
+# 7. NAVEGACIÓN Y CONTROL DE MÓDULOS (EJECUCIÓN)
 if modulo_seleccionado == "🌡️ Febriles":
     df = cargar_datos_csv("febriles_consolidado.csv", col_total_casos="feb_tot")
     if df is None:
