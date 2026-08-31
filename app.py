@@ -544,41 +544,45 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
     st.divider()
 
     # ==========================================
-    # FILA 2: Evolución Anual con Segmentos por Grupos de Años y Comparativo Últimas Semanas
+    # FILA 2: Evolución Anual Corregida en Eje X Lineal y Comparativo Últimas Semanas
     # ==========================================
     col_hist, col_right = st.columns([1.8, 1])
 
     with col_hist:
-        st.subheader("📉 Evolución Anual vs. Promedios por Grupos de Años")
+        st.subheader("📉 Evolución Anual vs. Promedios Históricos")
 
+        # Agrupación limpia garantizando tipo entero para el año
         df_totales_anuales = (
-            df.groupby("año")["casos_totales"]
+            df.groupby("año", as_index=False)["casos_totales"]
             .sum()
-            .reset_index()
             .sort_values("año")
         )
 
         if not df_totales_anuales.empty:
-            anios_totales = sorted(df_totales_anuales["año"].unique())
+            anio_min_total = int(df_totales_anuales["año"].min())
+            anio_max_total = int(df_totales_anuales["año"].max())
 
             # 1. Promedio Histórico Total
             promedio_total = df_totales_anuales["casos_totales"].mean()
 
-            # 2. Promedio y Rango Últimos 10 Años
-            ultimos_10 = anios_totales[-10:]
+            # 2. Promedio Últimos 10 Años
+            anios_totales_ord = sorted(df_totales_anuales["año"].unique())
+            ultimos_10 = anios_totales_ord[-10:]
             df_10 = df_totales_anuales[
                 df_totales_anuales["año"].isin(ultimos_10)
             ]
             promedio_10_anios = df_10["casos_totales"].mean()
+            anio_inicio_10 = int(min(ultimos_10))
 
-            # 3. Promedio y Rango Últimos 5 Años
-            ultimos_5 = anios_totales[-5:]
+            # 3. Promedio Últimos 5 Años
+            ultimos_5 = anios_totales_ord[-5:]
             df_5 = df_totales_anuales[df_totales_anuales["año"].isin(ultimos_5)]
             promedio_5_anios = df_5["casos_totales"].mean()
+            anio_inicio_5 = int(min(ultimos_5))
 
             fig_hist = go.Figure()
 
-            # 1. TRAZA: Casos Anuales (Línea Principal)
+            # 1. Casos Anuales (Secuencia horizontal extendida)
             fig_hist.add_trace(
                 go.Scatter(
                     x=df_totales_anuales["año"],
@@ -587,74 +591,47 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     name="Casos Anuales",
                     text=df_totales_anuales["casos_totales"],
                     textposition="top center",
-                    textfont=dict(size=12, color="#ffffff", weight="bold"),
-                    line=dict(
-                        shape="spline", smoothing=1.2, width=3, color="#ff7f0e"
-                    ),
-                    marker=dict(size=8, color="#ff7f0e"),
-                    fill="tozeroy",
-                    fillcolor="rgba(255, 127, 14, 0.12)",
+                    textfont=dict(size=11, color="#ffffff", weight="bold"),
+                    line=dict(shape="linear", width=3, color="#ff7f0e"),
+                    marker=dict(size=7, color="#ff7f0e"),
                 )
             )
 
-            # 2. TRAZA: Promedio Histórico Total (Segmento Completo)
+            # 2. Promedio Histórico Total
             fig_hist.add_trace(
                 go.Scatter(
-                    x=df_totales_anuales["año"],
-                    y=[promedio_total] * len(df_totales_anuales),
+                    x=[anio_min_total, anio_max_total],
+                    y=[promedio_total, promedio_total],
                     mode="lines",
                     name=f"Prom. Histórico Total ({int(promedio_total):,})",
                     line=dict(color="#00ffff", width=2, dash="dash"),
                 )
             )
 
-            # 3. TRAZA: Promedio Últimos 10 Años (Segmento delimitado a los 10 años)
+            # 3. Promedio Últimos 10 Años
             fig_hist.add_trace(
                 go.Scatter(
-                    x=df_10["año"],
-                    y=[promedio_10_anios] * len(df_10),
+                    x=[anio_inicio_10, anio_max_total],
+                    y=[promedio_10_anios, promedio_10_anios],
                     mode="lines",
                     name=f"Prom. Últimos 10 Años ({int(promedio_10_anios):,})",
-                    line=dict(color="#ffcc00", width=3, dash="dot"),
+                    line=dict(color="#ffcc00", width=2.5, dash="dot"),
                 )
             )
 
-            # 4. TRAZA: Promedio Últimos 5 Años (Segmento delimitado a los 5 años)
+            # 4. Promedio Últimos 5 Años
             fig_hist.add_trace(
                 go.Scatter(
-                    x=df_5["año"],
-                    y=[promedio_5_anios] * len(df_5),
+                    x=[anio_inicio_5, anio_max_total],
+                    y=[promedio_5_anios, promedio_5_anios],
                     mode="lines",
                     name=f"Prom. Últimos 5 Años ({int(promedio_5_anios):,})",
-                    line=dict(color="#00ff66", width=3, dash="solid"),
+                    line=dict(color="#00ff66", width=2.5, dash="solid"),
                 )
             )
 
-            # Franjas/Marcadores verticales dinámicos para los grupos de años
-            fig_hist.add_vrect(
-                x0=min(ultimos_10) - 0.3,
-                x1=max(ultimos_10) + 0.3,
-                fillcolor="#ffcc00",
-                opacity=0.05,
-                layer="below",
-                line_width=0,
-            )
-            fig_hist.add_vrect(
-                x0=min(ultimos_5) - 0.3,
-                x1=max(ultimos_5) + 0.3,
-                fillcolor="#00ff66",
-                opacity=0.08,
-                layer="below",
-                line_width=0,
-            )
-
-            # Margen dinámico en Y para dar espacio suficiente a las etiquetas de datos
-            max_valor_y = max(
-                df_totales_anuales["casos_totales"].max(),
-                promedio_total,
-                promedio_10_anios,
-                promedio_5_anios,
-            )
+            # Margen dinámico para evitar que las etiquetas se corten arriba
+            max_valor_y = df_totales_anuales["casos_totales"].max()
 
             fig_hist.update_layout(
                 title=f"TENDENCIA ANUAL DE {titulo_evento.upper()} VS. PROMEDIOS HISTÓRICOS",
@@ -663,10 +640,10 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                height=350,
+                height=360,
                 margin=dict(l=10, r=10, t=50, b=10),
-                xaxis=dict(type="category"),
-                yaxis=dict(range=[0, max_valor_y * 1.22]),
+                xaxis=dict(type="linear", dtick=1, tickformat="d"),
+                yaxis=dict(range=[0, max_valor_y * 1.25]),
                 legend=dict(
                     orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
                 ),
@@ -729,7 +706,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             fig_ult.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                height=350,
+                height=360,
                 margin=dict(l=10, r=10, t=50, b=10),
             )
             st.plotly_chart(
