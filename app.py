@@ -8,6 +8,17 @@ st.set_page_config(page_title="Sala Situacional Epidemiológica", layout="wide")
 DIRECTORIO = os.path.dirname(os.path.abspath(__file__))
 
 
+# Función para estandarizar nombres de columnas
+def estandarizar_columnas(df):
+    # Convertir todos los nombres de columnas a mayúsculas
+    df.columns = [str(col).upper().strip() for col in df.columns]
+
+    # Renombrar variaciones de AÑO a ANO
+    renombres = {"AÑO": "ANO", "ANIO": "ANO"}
+    df.rename(columns=renombres, inplace=True)
+    return df
+
+
 # Carga de datos según evento
 @st.cache_data
 def cargar_datos(evento):
@@ -16,7 +27,20 @@ def cargar_datos(evento):
         if not os.path.exists(ruta):
             return None
         df = pd.read_csv(ruta, low_memory=False)
-        df["TOTAL_CASOS"] = df["feb_tot"]
+        df = estandarizar_columnas(df)
+
+        # Manejo flexible de la columna total para febriles
+        if "FEB_TOT" in df.columns:
+            df["TOTAL_CASOS"] = df["FEB_TOT"]
+        elif "TOTAL" in df.columns:
+            df["TOTAL_CASOS"] = df["TOTAL"]
+        else:
+            # Si no encuentra columna de total, busca columnas numéricas
+            cols_num = df.select_dtypes(include=["number"]).columns
+            df["TOTAL_CASOS"] = (
+                df[cols_num[0]] if len(cols_num) > 0 else 0
+            )
+
         return df
 
     elif evento == "IRAS":
@@ -24,11 +48,12 @@ def cargar_datos(evento):
         if not os.path.exists(ruta):
             return None
         df = pd.read_csv(ruta, low_memory=False)
+        df = estandarizar_columnas(df)
 
         cols_ped = ["IRA_M2", "IRA_2_11", "IRA_1_4A"]
         for col in cols_ped:
             if col in df.columns:
-                df[col] = df[col].fillna(0)
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
             else:
                 df[col] = 0
 
@@ -50,16 +75,26 @@ df = cargar_datos(evento_seleccionado)
 if df is None:
     st.error(
         f"⚠️ No se encontró el archivo consolidado para **{evento_seleccionado}**. "
-        f"Asegúrate de ejecutar primero el script `Consolidar.py`."
+        f"Asegúrate de haber generado el archivo consolidado correspondiente."
     )
 else:
     st.title(f"📈 Sala Situacional - {evento_seleccionado}")
     st.markdown("---")
 
-    # Métrica de Años
-    anios_disponibles = sorted(df["ANO"].dropna().unique().astype(int))
+    # Métrica de Años (Con conversión segura a entero)
+    df["ANO"] = pd.to_numeric(df["ANO"], errors="coerce")
+    df = df.dropna(subset=["ANO"])
+    df["ANO"] = df["ANO"].astype(int)
+
+    anios_disponibles = sorted(df["ANO"].unique())
     anio_actual = max(anios_disponibles)
-    anio_anterior = anio_actual - 1
+    anio_anterior = (
+        anio_actual - 1
+        if (anio_actual - 1) in anios_disponibles
+        else anios_disponibles[-2]
+        if len(anios_disponibles) > 1
+        else anio_actual
+    )
 
     col1, col2 = st.columns(2)
     with col1:
@@ -77,7 +112,7 @@ else:
             ),
         )
 
-    # 1. Gráfico de Curva Semanal Comparativa (Gráfico nativo)
+    # 1. Gráfico de Curva Semanal Comparativa
     st.subheader(
         f"Comparativo Semanal: {anio_anterior} vs {anio_actual}"
     )
@@ -91,7 +126,7 @@ else:
 
     st.line_chart(df_comp)
 
-    # 2. Desglose por Grupos Etarios (Exclusivo IRAS - Gráfico nativo)
+    # 2. Desglose por Grupos Etarios (Exclusivo IRAS)
     if evento_seleccionado == "IRAS":
         st.subheader(f"Desglose por Grupo Etario Pediátrico ({anio_actual})")
 
