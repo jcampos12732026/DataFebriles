@@ -371,7 +371,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             df_sem = df_sem.sort_values(by="semana")
             colores_barras = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
 
-            # Aplicar filtro de recorte acumulado al gráfico semanal si está activo
             if incluye_anio_actual_g1 and corte_acumulado_g1:
                 df_sem = df_sem[df_sem["semana"] <= max_semana_real_data]
 
@@ -396,7 +395,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     )
                     idx_barra += 1
 
-            # 2. Último año presente como LÍNEA SUAVIZADA destacada (roja, con marcadores y etiquetas)
+            # 2. Último año presente como LÍNEA SUAVIZADA combinada
             if max_anio_presente in anios_en_datos:
                 df_ultimo = df_sem[df_sem["año"] == max_anio_presente]
 
@@ -587,7 +586,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
 
     st.divider()
 
-    # FILA 2: Evolución Anual & Comparativo / Grupos Etarios
+    # FILA 2: Evolución Anual & Panel Izquierdo Inferior (Brecha) / Grupos Etarios (Derecha)
     col_hist, col_right = st.columns([1.8, 1])
 
     with col_hist:
@@ -740,6 +739,39 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             )
             st.plotly_chart(
                 fig_hist, use_container_width=True, config=config_plotly
+            )
+
+        # --- ALERTA INSTITUCIONAL DE BRECHA EPIDEMIOLÓGICA (IZQUIERDA INFERIOR) ---
+        brecha_semanas = semana_epidemiologica_actual - max_semana_real_data
+        if brecha_semanas > 0:
+            st.markdown(
+                f"""
+                <div style="background: linear-gradient(135deg, rgba(61, 12, 17, 0.95), rgba(92, 29, 36, 0.95)); border-left: 5px solid #D90429; border-radius: 6px; padding: 14px 18px; margin-top: 15px; box-shadow: 0px 4px 15px rgba(217, 4, 4, 0.25);">
+                    <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 16px; margin-right: 8px;">⚠️</span>
+                        <h4 style="margin: 0; color: #ff8093; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Monitoreo de Brecha de Información ({titulo_evento})</h4>
+                    </div>
+                    <p style="margin: 0; color: #f1f1f1; font-size: 13px; line-height: 1.5;">
+                        Nos encontramos transitando la <b>Semana Epidemiológica N° {semana_epidemiologica_actual}</b> del año actual; sin embargo, el sistema registra consolidación oficial de datos únicamente hasta la <b>Semana N° {max_semana_real_data}</b> ({max_anio_data}). Se identifica un desfase operativo pendiente de <b>{brecha_semanas} semana(s)</b> por sincronizar en la base de datos.
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f"""
+                <div style="background: linear-gradient(135deg, rgba(10, 51, 26, 0.95), rgba(17, 92, 42, 0.95)); border-left: 5px solid #00FF66; border-radius: 6px; padding: 14px 18px; margin-top: 15px; box-shadow: 0px 4px 15px rgba(0, 255, 102, 0.2);">
+                    <div style="display: flex; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 16px; margin-right: 8px;">✅</span>
+                        <h4 style="margin: 0; color: #80ffb2; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Sincronización al 100% ({titulo_evento})</h4>
+                    </div>
+                    <p style="margin: 0; color: #f1f1f1; font-size: 13px; line-height: 1.5;">
+                        La carga de información se encuentra plenamente al día. Estando en la <b>Semana Epidemiológica N° {semana_epidemiologica_actual}</b>, los registros de datos alcanzan de manera óptima hasta la <b>Semana N° {max_semana_real_data}</b> del período {max_anio_data}.
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
     with col_right:
