@@ -285,7 +285,124 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
         else anios_disponibles
     )
 
-    # SECCIÓN PRINCIPAL: Evolución Anual & Comparativo Específico
+    # FILA 1: Episodios Semanales (Ocupa todo el ancho)
+    st.subheader(f"📊 Episodios Semanales de {titulo_evento}")
+
+    col_f1, col_f2 = st.columns([3, 1])
+    with col_f1:
+        anios_g1 = st.multiselect(
+            "Seleccionar Año(s) - Semanal:",
+            anios_disponibles,
+            default=ultimos_dos_anios,
+            key=f"{key_prefix}_g1_anios",
+        )
+    with col_f2:
+        st.markdown(
+            "<div style='height: 22px;'></div>", unsafe_allow_html=True
+        )
+        incluye_anio_actual_g1 = max_anio_data in anios_g1
+        label_chk_g1 = f"Acumulado hasta SE {max_semana_real_data} ({max_anio_data})"
+        corte_acumulado_g1 = st.checkbox(
+            label_chk_g1,
+            value=True if incluye_anio_actual_g1 else False,
+            disabled=not incluye_anio_actual_g1,
+            key=f"{key_prefix}_chk_corte_g1",
+        )
+
+    df_g1 = df[df["año"].isin(anios_g1)].copy()
+    if incluye_anio_actual_g1 and corte_acumulado_g1:
+        df_g1 = df_g1[df_g1["semana"] <= max_semana_real_data]
+
+    if not df_g1.empty:
+        df_sem = (
+            df_g1.groupby(["semana", "año"])["casos_totales"]
+            .sum()
+            .reset_index()
+        )
+        fig_sem = go.Figure()
+        anios_en_datos = sorted(df_sem["año"].unique())
+        max_anio_presente = (
+            max(anios_en_datos) if anios_en_datos else max_anio_data
+        )
+
+        # Ordenar las semanas numéricamente
+        df_sem = df_sem.sort_values(by="semana")
+
+        colores_barras_inst = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
+
+        # Años anteriores en Barras
+        for idx, anio in enumerate(anios_en_datos):
+            if anio != max_anio_presente:
+                df_anio = df_sem[df_sem["año"] == anio]
+                fig_sem.add_trace(
+                    go.Bar(
+                        x=df_anio["semana"],
+                        y=df_anio["casos_totales"],
+                        name=str(anio),
+                        marker_color=colores_barras_inst[
+                            idx % len(colores_barras_inst)
+                        ],
+                        opacity=0.8,
+                        text=df_anio["casos_totales"],
+                        textposition="auto",
+                        textfont=dict(size=12, color="white"),
+                    )
+                )
+
+        # Año Actual en Línea Suavizada sobre las semanas correspondientes
+        if max_anio_presente in anios_en_datos:
+            df_ultimo = df_sem[df_sem["año"] == max_anio_presente]
+            fig_sem.add_trace(
+                go.Scatter(
+                    x=df_ultimo["semana"],
+                    y=df_ultimo["casos_totales"],
+                    name=f"{max_anio_presente} (Actual)",
+                    mode="lines+markers+text",
+                    text=df_ultimo["casos_totales"],
+                    textposition="top center",
+                    textfont=dict(
+                        size=13,
+                        color="#D90429",
+                        family="sans-serif",
+                        weight="bold",
+                    ),
+                    line=dict(
+                        shape="spline",
+                        smoothing=0.8,
+                        width=3.5,
+                        color="#D90429",
+                    ),
+                    marker=dict(size=8, color="#D90429"),
+                )
+            )
+
+        texto_corte_titulo_g1 = (
+            f" (HASTA SE {max_semana_real_data})"
+            if (incluye_anio_actual_g1 and corte_acumulado_g1)
+            else " (AÑOS COMPLETOS)"
+        )
+        fig_sem.update_layout(
+            title=f"TOTAL DE EPISODIOS SEMANALES DE {titulo_evento.upper()}{texto_corte_titulo_g1}",
+            xaxis_title="N° de Semana",
+            yaxis_title="Casos",
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=360,
+            margin=dict(l=10, r=10, t=40, b=10),
+            xaxis=dict(type="category"),
+            barmode="group",
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+            ),
+        )
+        st.plotly_chart(
+            fig_sem, use_container_width=True, config=config_plotly
+        )
+
+    st.divider()
+
+    # FILA 2: Evolución Anual & Comparativo Específico
     col_hist, col_right = st.columns([1.8, 1])
 
     with col_hist:
