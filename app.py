@@ -762,24 +762,25 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
+            # --- LÍNEAS VERTICALES DE CORTE CON NUEVOS COLORES Y TEXTOS COMPLETOS ---
             fig_hist.add_vline(
                 x=anio_inicio_10,
-                line_width=2,
+                line_width=2.5,
                 line_dash="dashdot",
-                line_color="#FFEA00",
-                annotation_text="Inicio U10A",
+                line_color="#00E5FF",  # Cian brillante distintivo
+                annotation_text="Inicio Út. 10 Años",
                 annotation_position="top left",
-                annotation_font=dict(color="#FFEA00", size=11, weight="bold"),
+                annotation_font=dict(color="#00E5FF", size=11, weight="bold"),
             )
 
             fig_hist.add_vline(
                 x=anio_inicio_5,
-                line_width=2,
+                line_width=2.5,
                 line_dash="dashdot",
-                line_color="#D90429",
-                annotation_text="Inicio U5A",
+                line_color="#FF9100",  # Naranja brillante distintivo
+                annotation_text="Inicio Út. 5 Años",
                 annotation_position="top left",
-                annotation_font=dict(color="#D90429", size=11, weight="bold"),
+                annotation_font=dict(color="#FF9100", size=11, weight="bold"),
             )
 
             max_valor_y = max(
