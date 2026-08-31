@@ -371,7 +371,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             df_sem = df_sem.sort_values(by="semana")
             colores_lineas = ["#0088CC", "#4A90E2", "#6C757D"]
 
-            # 1. Años anteriores como líneas (Estilo Excel)
+            # 1. Años anteriores como líneas suavizadas
             idx_linea = 0
             for anio in anios_en_datos:
                 if anio != max_anio_presente:
@@ -386,21 +386,19 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                             textposition="top center",
                             textfont=dict(size=11, color="#00CCFF"),
                             line=dict(
+                                shape="spline",
+                                smoothing=1.3,
                                 width=2.5,
                                 color=colores_lineas[
                                     idx_linea % len(colores_lineas)
                                 ],
                             ),
-                            marker=dict(
-                                size=6,
-                                symbol="circle-open",
-                                line=dict(width=2),
-                            ),
+                            marker=dict(size=6, symbol="circle-open"),
                         )
                     )
                     idx_linea += 1
 
-            # 2. Año actual como Barras (Estilo Excel)
+            # 2. Último año presente en la data como línea suavizada destacada (roja, con marcadores y etiquetas)
             if max_anio_presente in anios_en_datos:
                 df_ultimo = df_sem[df_sem["año"] == max_anio_presente].copy()
                 if corte_acumulado_g1:
@@ -409,15 +407,30 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     ]
 
                 fig_sem.add_trace(
-                    go.Bar(
+                    go.Scatter(
                         x=df_ultimo["semana"],
                         y=df_ultimo["casos_totales"],
                         name=f"{max_anio_presente} (Actual)",
-                        marker_color="#D90429",
-                        opacity=0.85,
+                        mode="lines+markers+text",
                         text=df_ultimo["casos_totales"],
-                        textposition="auto",
-                        textfont=dict(size=12, color="white", weight="bold"),
+                        textposition="top center",
+                        textfont=dict(
+                            size=12,
+                            color="#FFFFFF",
+                            family="sans-serif",
+                            weight="bold",
+                        ),
+                        line=dict(
+                            shape="spline",
+                            smoothing=1.3,
+                            width=4,
+                            color="#D90429",
+                        ),
+                        marker=dict(
+                            size=8,
+                            color="#D90429",
+                            line=dict(width=2, color="#FFFFFF"),
+                        ),
                     )
                 )
 
@@ -441,7 +454,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     categoryarray=list(range(1, 54)),
                     dtick=1,
                 ),
-                barmode="overlay",
                 legend=dict(
                     orientation="v", yanchor="top", y=1, xanchor="left", x=1.02
                 ),
