@@ -369,40 +369,34 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             )
 
             df_sem = df_sem.sort_values(by="semana")
-            colores_lineas = ["#0088CC", "#4A90E2", "#6C757D"]
+            colores_barras = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
 
             # Aplicar filtro de recorte acumulado al gráfico semanal si está activo
             if incluye_anio_actual_g1 and corte_acumulado_g1:
                 df_sem = df_sem[df_sem["semana"] <= max_semana_real_data]
 
-            # 1. Años anteriores como líneas suavizadas
-            idx_linea = 0
+            # 1. Años anteriores como BARRAS agrupadas limpias
+            idx_barra = 0
             for anio in anios_en_datos:
                 if anio != max_anio_presente:
                     df_anio = df_sem[df_sem["año"] == anio]
                     fig_sem.add_trace(
-                        go.Scatter(
+                        go.Bar(
                             x=df_anio["semana"],
                             y=df_anio["casos_totales"],
                             name=str(anio),
-                            mode="lines+markers+text",
+                            marker_color=colores_barras[
+                                idx_barra % len(colores_barras)
+                            ],
+                            opacity=0.75,
                             text=df_anio["casos_totales"],
-                            textposition="top center",
-                            textfont=dict(size=11, color="#00CCFF"),
-                            line=dict(
-                                shape="spline",
-                                smoothing=1.3,
-                                width=2.5,
-                                color=colores_lineas[
-                                    idx_linea % len(colores_lineas)
-                                ],
-                            ),
-                            marker=dict(size=6, symbol="circle-open"),
+                            textposition="auto",
+                            textfont=dict(size=10, color="white"),
                         )
                     )
-                    idx_linea += 1
+                    idx_barra += 1
 
-            # 2. Último año presente en la data como línea suavizada destacada (roja, con marcadores y etiquetas)
+            # 2. Último año presente como LÍNEA SUAVIZADA destacada (roja, con marcadores y etiquetas)
             if max_anio_presente in anios_en_datos:
                 df_ultimo = df_sem[df_sem["año"] == max_anio_presente]
 
@@ -448,6 +442,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 plot_bgcolor="rgba(0,0,0,0)",
                 height=360,
                 margin=dict(l=10, r=10, t=40, b=10),
+                barmode="group",
                 xaxis=dict(
                     type="category",
                     categoryorder="array",
