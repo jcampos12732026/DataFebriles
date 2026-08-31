@@ -5,13 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-# Configuración y estilos
-st.set_page_config(
-    page_title="Sala Situacional Epidemiológica - C.S. César López Silva",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
+# Ocultar elementos de la interfaz predeterminada de Streamlit
 st.markdown(
     """
     <style>
@@ -27,6 +21,13 @@ st.markdown(
     </style>
 """,
     unsafe_allow_html=True,
+)
+
+# Configuración de página
+st.set_page_config(
+    page_title="Sala Situacional Epidemiológica - C.S. César López Silva",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 
@@ -125,7 +126,7 @@ with st.sidebar:
   )
 
 
-# Gráfico especial de Grupos Etarios para IRAS
+# Función para renderizar gráfico por grupo etario (IRAS)
 def renderizar_grafico_grupos_etarios(df, titulo_evento):
   cols_grupos = {
       "ira_m2": "Menores de 2 meses",
@@ -137,43 +138,34 @@ def renderizar_grafico_grupos_etarios(df, titulo_evento):
   if not cols_presentes:
     return
 
-  st.subheader(f"👶 Total de casos de {titulo_evento} por grupo etario")
-
+  # Determinar la última semana que contiene datos (> 0 casos) en el último año disponible
   anios_disponibles = sorted(df["año"].unique())
+  max_anio = max(anios_disponibles) if anios_disponibles else hoy.year
+  df_max = df[(df["año"] == max_anio) & (df["casos_totales"] > 0)]
+
+  semana_max_data = (
+      int(df_max["semana"].max())
+      if not df_max.empty
+      else semana_epidemiologica_actual
+  )
+
+  # Selector dinámico de Años
   ultimos_dos_anios = (
       anios_disponibles[-2:]
       if len(anios_disponibles) >= 2
       else anios_disponibles
   )
-
-  max_anio = max(anios_disponibles) if anios_disponibles else hoy.year
-  df_max = df[df["año"] == max_anio]
-  semana_corte = (
-      int(df_max[df_max["casos_totales"] > 0]["semana"].max())
-      if not df_max.empty
-      else semana_epidemiologica_actual
+  anios_sel = st.multiselect(
+      "Seleccionar Año(s) - Grupo Etario:",
+      anios_disponibles,
+      default=ultimos_dos_anios,
+      key="etario_multiselect",
   )
 
-  col_f1, col_f2 = st.columns([1.5, 1])
-  with col_f1:
-    anios_sel = st.multiselect(
-        "Seleccionar Año(s) - Grupo Etario:",
-        anios_disponibles,
-        default=ultimos_dos_anios,
-        key="etario_multiselect",
-    )
-  with col_f2:
-    st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True)
-    aplicar_corte = st.checkbox(
-        f"Acumulado hasta SE {semana_corte} ({max_anio})",
-        value=True,
-        key="etario_corte_chk",
-    )
-
+  # Filtrar por los años seleccionados
   df_filtrado = df[df["año"].isin(anios_sel)].copy()
-  if aplicar_corte:
-    df_filtrado = df_filtrado[df_filtrado["semana"] <= semana_corte]
 
+  # Mapeo y preparación de datos
   df_etario = df_filtrado.melt(
       id_vars=["año"],
       value_vars=cols_presentes,
@@ -188,6 +180,13 @@ def renderizar_grafico_grupos_etarios(df, titulo_evento):
   df_resumen["año_str"] = df_resumen["año"].astype(str)
 
   orden_categorias = ["Menores de 2 meses", "2-11 Meses", "1-4 Años"]
+
+  # Título ajustado con la última semana registrada
+  st.markdown(
+      f"#### Total de casos de {titulo_evento} por grupo etario - C.S. César"
+      f" López Silva / RIS CHACLACAYO (hasta la semana epidemiológica"
+      f" {semana_max_data})"
+  )
 
   fig = px.bar(
       df_resumen,
@@ -227,17 +226,21 @@ def renderizar_grafico_grupos_etarios(df, titulo_evento):
   st.plotly_chart(fig, use_container_width=True, config=config_plotly)
 
 
-# Módulos de ejecución
+# Lógica de Renderizado por Módulos
 if modulo_seleccionado == "🫁 IRAS":
   df = cargar_datos_csv("iras_consolidado.csv", col_total_casos="feb_tot")
   if df is not None:
     renderizar_grafico_grupos_etarios(df, "IRAs")
   else:
-    st.error("⚠️ No se encontró `iras_consolidado.csv`.")
+    st.error("⚠️ No se encontró la data `iras_consolidado.csv`.")
 
 elif modulo_seleccionado == "🌡️ Febriles":
   df = cargar_datos_csv("febriles_consolidado.csv", col_total_casos="feb_tot")
   if df is not None:
-    st.success("Módulo Febriles cargado correctamente.")
+    st.title("🌡️ Sala Situacional de Febriles")
+    # Gráficas o indicadores de Febriles aquí
   else:
-    st.error("⚠️ No se encontró `febriles_consolidado.csv`.")
+    st.error("⚠️ No se encontró la data `febriles_consolidado.csv`.")
+
+elif modulo_seleccionado == "🦟 Dengue":
+  st.title("🦟 Sala Situacional de Dengue")
