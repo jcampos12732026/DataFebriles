@@ -356,14 +356,15 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 max(anios_en_datos) if anios_en_datos else max_anio_data
             )
 
+            # Ordenar las semanas numéricamente para evitar cruces en la línea
+            df_sem = df_sem.sort_values(by="semana")
+
             colores_barras_inst = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
 
-            # Años anteriores -> BARRAS INSTITUCIONALES
+            # Años anteriores en Barras Institucionales
             for idx, anio in enumerate(anios_en_datos):
                 if anio != max_anio_presente:
-                    df_anio = df_sem[df_sem["año"] == anio].sort_values(
-                        "semana"
-                    )
+                    df_anio = df_sem[df_sem["año"] == anio]
                     fig_sem.add_trace(
                         go.Bar(
                             x=df_anio["semana"],
@@ -379,11 +380,9 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                         )
                     )
 
-            # Último año (Actual) -> LÍNEA SUAVIZADA ROJA ALERTA MINSA
+            # Último Año (Actual) en Línea Suavizada
             if max_anio_presente in anios_en_datos:
-                df_ultimo = df_sem[df_sem["año"] == max_anio_presente].sort_values(
-                    "semana"
-                )
+                df_ultimo = df_sem[df_sem["año"] == max_anio_presente]
                 fig_sem.add_trace(
                     go.Scatter(
                         x=df_ultimo["semana"],
@@ -400,8 +399,8 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                         ),
                         line=dict(
                             shape="spline",
-                            smoothing=1.3,
-                            width=4,
+                            smoothing=0.8,
+                            width=3.5,
                             color="#D90429",
                         ),
                         marker=dict(size=8, color="#D90429"),
@@ -717,7 +716,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 fig_hist, use_container_width=True, config=config_plotly
             )
 
-    # COLUMNA DERECHA: Diferenciada según el Módulo (Febriles mantiene 2 semanas / IRAS compara acumulado)
     with col_right:
         if key_prefix == "febriles":
             st.subheader("📈 Comparativo Últimas Semanas")
@@ -785,7 +783,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
 
         else:
-            # Módulo IRAS: Comparativo Semanal Acumulado (SE 1 a SE corte)
             st.subheader("📊 Comparativo Semanal Acumulado")
 
             col_c1, col_c2 = st.columns([1.5, 1])
