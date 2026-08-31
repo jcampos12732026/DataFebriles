@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 2. Ocultar elementos nativos de Streamlit y aplicar CSS personalizado
+# 2. Estilos CSS personalizados
 st.markdown(
     """
     <style>
@@ -62,7 +62,7 @@ st.markdown(
 )
 
 
-# 3. Función para calcular la Semana Epidemiológica en Perú (Inicio: Domingo)
+# 3. Función para calcular la Semana Epidemiológica
 def obtener_semana_epidemiologica(fecha):
     primer_dia = datetime(fecha.year, 1, 1)
     dias_hasta_domingo = (6 - primer_dia.weekday()) % 7
@@ -76,7 +76,6 @@ def obtener_semana_epidemiologica(fecha):
     return semana
 
 
-# Diccionario de meses
 meses_nombre = {
     1: "Enero",
     2: "Febrero",
@@ -93,7 +92,7 @@ meses_nombre = {
 }
 
 
-# 4. Carga y procesamiento genérico para datasets (Febriles / IRAS)
+# 4. Carga y procesamiento genérico de datasets
 def cargar_datos_csv(nombre_archivo, col_total_casos=None):
     if not os.path.exists(nombre_archivo):
         return None
@@ -103,7 +102,6 @@ def cargar_datos_csv(nombre_archivo, col_total_casos=None):
     if "ano" in df.columns:
         df = df.rename(columns={"ano": "año"})
 
-    # Procesa columnas específicas de grupos etarios si es dataset de IRAS
     cols_iras = ["ira_m2", "ira_2_11", "ira_1_4a"]
     tiene_cols_iras = all(col in df.columns for col in cols_iras)
 
@@ -189,7 +187,6 @@ else:
     )
 
 
-# 5. Función especial para renderizar el gráfico por Grupos Etarios (Exclusivo IRAS)
 def renderizar_grafico_grupos_etarios(df, key_prefix):
     cols_iras = ["ira_m2", "ira_2_11", "ira_1_4a"]
     if not all(c in df.columns for c in cols_iras):
@@ -259,7 +256,7 @@ def renderizar_grafico_grupos_etarios(df, key_prefix):
         )
 
 
-# 6. Función Renderizadora Principal del Dashboard
+# 5. Función Renderizadora Principal
 def renderizar_dashboard(df, titulo_evento, key_prefix):
     if df.empty or "año" not in df.columns:
         st.warning(
@@ -316,9 +313,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
         else anios_disponibles
     )
 
-    # ==========================================
     # FILA 1: Episodios Semanales y Mensualizados
-    # ==========================================
     col_mid, col_mes = st.columns([1.8, 1])
 
     with col_mid:
@@ -576,9 +571,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
 
     st.divider()
 
-    # ==========================================
-    # FILA 2: Evolución Anual Suavizada & Comparativo Últimas Semanas
-    # ==========================================
+    # FILA 2: Evolución Anual & Comparativo Semanal de la SE 1 a la SE Actual
     col_hist, col_right = st.columns([1.8, 1])
 
     with col_hist:
@@ -622,7 +615,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
 
             fig_hist = go.Figure()
 
-            # Curva Suavizada Spline
             fig_hist.add_trace(
                 go.Scatter(
                     x=df_totales_anuales["año"],
@@ -648,7 +640,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # Promedio Histórico Total
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
@@ -659,7 +650,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # Promedio Últimos 10 Años
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
@@ -670,7 +660,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # Promedio Últimos 5 Años
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
@@ -681,7 +670,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # Líneas Verticales Indicadoras
             fig_hist.add_vline(
                 x=anio_inicio_10,
                 line_width=2,
@@ -738,40 +726,46 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 fig_hist, use_container_width=True, config=config_plotly
             )
 
+    # NUEVO COMPORTAMIENTO: Comparativo Semanal Completo (SE 1 a SE corte)
     with col_right:
-        st.subheader("📈 Comparativo Últimas Semanas")
+        st.subheader("📊 Comparativo Semanal Acumulado")
 
-        anios_g2 = st.multiselect(
-            "Seleccionar Año(s) - Últimas Semanas:",
-            anios_disponibles,
-            default=ultimos_dos_anios,
-            key=f"{key_prefix}_g2_anios",
-        )
+        col_c1, col_c2 = st.columns([1.5, 1])
+        with col_c1:
+            anios_g2 = st.multiselect(
+                "Año(s) - Comparativo:",
+                anios_disponibles,
+                default=ultimos_dos_anios,
+                key=f"{key_prefix}_g2_anios",
+            )
+        with col_c2:
+            st.markdown(
+                "<div style='height: 22px;'></div>", unsafe_allow_html=True
+            )
+            incluye_anio_actual_g2 = max_anio_data in anios_g2
+            label_chk_g2 = f"Recortar hasta SE {max_semana_real_data} ({max_anio_data})"
+            corte_acumulado_g2 = st.checkbox(
+                label_chk_g2,
+                value=True if incluye_anio_actual_g2 else False,
+                disabled=not incluye_anio_actual_g2,
+                key=f"{key_prefix}_chk_corte_g2",
+            )
 
-        semanas_disponibles_data = sorted(
-            df_max_anio[df_max_anio["casos_totales"] > 0]["semana"].unique()
-        )
-        if len(semanas_disponibles_data) >= 2:
-            semanas_ultimas = [
-                semanas_disponibles_data[-2],
-                semanas_disponibles_data[-1],
+        df_comp_base = df[df["año"].isin(anios_g2)].copy()
+
+        if incluye_anio_actual_g2 and corte_acumulado_g2:
+            df_comp_base = df_comp_base[
+                df_comp_base["semana"] <= max_semana_real_data
             ]
-        elif len(semanas_disponibles_data) == 1:
-            semanas_ultimas = [semanas_disponibles_data[0]]
-        else:
-            semanas_ultimas = [semana_epidemiologica_actual]
 
-        df_comp_data = df[
-            (df["año"].isin(anios_g2)) & (df["semana"].isin(semanas_ultimas))
-        ].copy()
-        df_comp_data["año_str"] = df_comp_data["año"].astype(str)
-
-        if not df_comp_data.empty:
+        if not df_comp_base.empty:
             df_comp = (
-                df_comp_data.groupby(["semana", "año_str"])["casos_totales"]
+                df_comp_base.groupby(["semana", "año"])["casos_totales"]
                 .sum()
                 .reset_index()
             )
+            df_comp["año_str"] = df_comp["año"].astype(str)
+
             fig_ult = px.bar(
                 df_comp,
                 x="semana",
@@ -780,32 +774,39 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 barmode="group",
                 text="casos_totales",
                 template="plotly_dark",
-                title=f"Semanas {' y '.join(map(str, semanas_ultimas))}",
                 labels={
                     "semana": "N° de Semana",
                     "casos_totales": "Casos",
                     "año_str": "Año",
                 },
+                color_discrete_sequence=px.colors.qualitative.Bold,
             )
-            fig_ult.update_traces(textfont_size=13, textposition="auto")
+
+            fig_ult.update_traces(textfont_size=12, textposition="auto")
             fig_ult.update_xaxes(type="category")
+
+            rango_semanas_texto = f"Semanas 1 a {max_semana_real_data}"
+
             fig_ult.update_layout(
+                title=f"COMPARATIVO SEMANAL ({rango_semanas_texto.upper()})",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 height=380,
                 margin=dict(l=10, r=10, t=50, b=10),
+                legend=dict(
+                    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                ),
             )
             st.plotly_chart(
                 fig_ult, use_container_width=True, config=config_plotly
             )
 
-    # Si es el Módulo de IRAS, añade la sección de Grupos Etarios al final
     if key_prefix == "iras":
         st.divider()
         renderizar_grafico_grupos_etarios(df, key_prefix)
 
 
-# 7. NAVEGACIÓN Y CONTROL DE MÓDULOS
+# 6. NAVEGACIÓN Y CONTROL DE MÓDULOS
 if modulo_seleccionado == "🌡️ Febriles":
     df = cargar_datos_csv("febriles_consolidado.csv", col_total_casos="feb_tot")
     if df is None:
