@@ -392,7 +392,9 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                                 ],
                             ),
                             marker=dict(
-                                size=6, symbol="circle-open", width=2
+                                size=6,
+                                symbol="circle-open",
+                                line=dict(width=2),
                             ),
                         )
                     )
