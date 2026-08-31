@@ -543,7 +543,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
     st.divider()
 
     # ==========================================
-    # FILA 2: Evolución Anual Suavizada con Relleno Profesional y Sin Grid Horizontal
+    # FILA 2: Evolución Anual Suavizada con Visualización Optimizada en Extremos
     # ==========================================
     col_hist, col_right = st.columns([1.8, 1])
 
@@ -560,6 +560,19 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             anio_min_total = int(df_totales_anuales["año"].min())
             anio_max_total = int(df_totales_anuales["año"].max())
             anios_totales_ord = sorted(df_totales_anuales["año"].unique())
+
+            # Configuración de Posicionamiento de Texto Dinámico para Extremos
+            # El primer punto se orienta 'top right' y el último 'top left' para no salirse de los márgenes
+            posiciones_texto = []
+            cant_puntos = len(df_totales_anuales)
+
+            for idx in range(cant_puntos):
+                if idx == 0:
+                    posiciones_texto.append("top right")
+                elif idx == cant_puntos - 1:
+                    posiciones_texto.append("top left")
+                else:
+                    posiciones_texto.append("top center")
 
             # Promedios
             promedio_total = df_totales_anuales["casos_totales"].mean()
@@ -578,7 +591,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
 
             fig_hist = go.Figure()
 
-            # 1. Casos Anuales (Curva Suavizada Spline + Relleno Profesional Degradado Naranja High-Contrast)
+            # 1. Casos Anuales (Curva Suavizada Spline + Relleno Profesional + Texto Optimizado)
             fig_hist.add_trace(
                 go.Scatter(
                     x=df_totales_anuales["año"],
@@ -586,15 +599,15 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     mode="lines+markers+text",
                     name="Casos Anuales",
                     text=df_totales_anuales["casos_totales"],
-                    textposition="top center",
+                    textposition=posiciones_texto,
                     textfont=dict(size=12, color="#ffffff", weight="bold"),
                     fill="tozeroy",
-                    fillcolor="rgba(255, 102, 0, 0.22)",  # Sombreado elegante y cálido
+                    fillcolor="rgba(255, 102, 0, 0.22)",
                     line=dict(
                         shape="spline",
                         smoothing=1.3,
                         width=4,
-                        color="#FF6600",  # Naranja Vivo de Alto Contraste
+                        color="#FF6600",
                     ),
                     marker=dict(
                         size=9,
@@ -604,7 +617,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # 2. Promedio Histórico Total (Cyan Neón Intenso)
+            # 2. Promedio Histórico Total (Cyan Neón)
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
@@ -615,7 +628,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # 3. Promedio Últimos 10 Años (Amarillo Neón Puro)
+            # 3. Promedio Últimos 10 Años (Amarillo Neón)
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
@@ -626,7 +639,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # 4. Promedio Últimos 5 Años (Verde Neón Brillante)
+            # 4. Promedio Últimos 5 Años (Verde Neón)
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
@@ -673,16 +686,19 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 height=380,
-                margin=dict(l=10, r=10, t=50, b=10),
-                # SE ELIMINA LA CUADRÍCULA HORIZONTAL (showgrid=False)
+                margin=dict(l=20, r=20, t=50, b=10),
                 yaxis=dict(
-                    range=[0, max_valor_y * 1.28],
+                    range=[0, max_valor_y * 1.30],
                     showgrid=False,
                     zeroline=True,
                     zerolinecolor="rgba(255,255,255,0.2)",
                 ),
+                # AÑADIDO UN PADDING EN X (-0.5 A +0.5) PARA QUE NINGÚN DATO EXTREMO SE CORTE CON EL BORDE
                 xaxis=dict(
-                    type="linear", dtick=1, tickformat="d", showgrid=False
+                    range=[anio_min_total - 0.5, anio_max_total + 0.5],
+                    dtick=1,
+                    tickformat="d",
+                    showgrid=False,
                 ),
                 legend=dict(
                     orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
