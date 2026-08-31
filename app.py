@@ -25,7 +25,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Estilos CSS unificados (Diseño Piloto Oscuro Futurista)
+# Estilos CSS unificados
 st.markdown(
     """
     <style>
@@ -132,7 +132,6 @@ def cargar_datos_csv(nombre_archivo, col_total_casos="feb_tot"):
     if "ano" in df.columns:
         df = df.rename(columns={"ano": "año"})
 
-    # Detectar columna de total de casos si variara en IRAS
     if col_total_casos not in df.columns:
         posibles_cols = [
             c
@@ -173,7 +172,7 @@ config_plotly = {"displayModeBar": "hover"}
 hoy = datetime.now()
 semana_epidemiologica_actual = obtener_semana_epidemiologica(hoy)
 
-# --- BARRA LATERAL (MENU ESCALABLE) ---
+# --- BARRA LATERAL ---
 with st.sidebar:
     st.markdown(
         f"""
@@ -227,7 +226,7 @@ else:
     )
 
 
-# FUNCIÓN RENDERIZADORA REUTILIZABLE PARA DASHBOARDS (CON PROTECCIÓN ANTI-BLANK/NaN)
+# FUNCIÓN RENDERIZADORA REUTILIZABLE PARA DASHBOARDS
 def renderizar_dashboard(df, titulo_evento, key_prefix):
     if df.empty or "año" not in df.columns:
         st.warning(
@@ -238,7 +237,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
     max_anio_data = int(df["año"].max())
     df_max_anio = df[df["año"] == max_anio_data]
 
-    # Filtrado seguro para evitar ValueError si no hay registros mayores a cero
+    # Filtrado seguro para evitar errores con data vacía
     df_con_casos = df_max_anio[df_max_anio["casos_totales"] > 0]
 
     if not df_con_casos.empty and pd.notna(df_con_casos["semana"].max()):
@@ -259,7 +258,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
         )
         max_mes_num_real_data = int(max_mes_val) if pd.notna(max_mes_val) else 1
 
-    # Rango del mes entre 1 y 12
     max_mes_num_real_data = max(1, min(12, max_mes_num_real_data))
 
     orden_meses = [
@@ -546,49 +544,94 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
     st.divider()
 
     # ==========================================
-    # FILA 2: Evolución Anual y Comparativo Últimas Semanas
+    # FILA 2: Evolución Anual con Promedios Históricos y Comparativo Últimas Semanas
     # ==========================================
     col_hist, col_right = st.columns([1.8, 1])
 
     with col_hist:
-        st.subheader("📉 Evolución Anual Acumulada")
+        st.subheader("📉 Evolución Anual vs. Promedios Históricos")
 
-        anios_hist = st.multiselect(
-            "Seleccionar Año(s) - Anual:",
-            anios_disponibles,
-            default=anios_disponibles,
-            key=f"{key_prefix}_g4_anios",
+        # Calculamos totales por año usando la data completa sin selectores
+        df_totales_anuales = (
+            df.groupby("año")["casos_totales"]
+            .sum()
+            .reset_index()
+            .sort_values("año")
         )
-        df_hist_base = df[df["año"].isin(anios_hist)].copy()
 
-        if not df_hist_base.empty:
-            df_hist = (
-                df_hist_base.groupby("año")["casos_totales"]
-                .sum()
-                .reset_index()
-                .sort_values("año")
-            )
+        if not df_totales_anuales.empty:
+            # 1. Promedio Histórico Total (Todos los años disponibles)
+            promedio_total = df_totales_anuales["casos_totales"].mean()
+
+            # 2. Promedio Últimos 5 Años
+            anios_totales = df_totales_anuales["año"].unique()
+            ultimos_5_anios = sorted(anios_totales)[-5:]
+            promedio_5_anios = df_totales_anuales[
+                df_totales_anuales["año"].isin(ultimos_5_anios)
+            ]["casos_totales"].mean()
+
+            # 3. Promedio Últimos 10 Años
+            ultimos_10_anios = sorted(anios_totales)[-10:]
+            promedio_10_anios = df_totales_anuales[
+                df_totales_anuales["año"].isin(ultimos_10_anios)
+            ]["casos_totales"].mean()
 
             fig_hist = go.Figure()
+
+            # Curva principal de casos anuales registrados
             fig_hist.add_trace(
                 go.Scatter(
-                    x=df_hist["año"],
-                    y=df_hist["casos_totales"],
+                    x=df_totales_anuales["año"],
+                    y=df_totales_anuales["casos_totales"],
                     mode="lines+markers+text",
-                    text=df_hist["casos_totales"],
+                    name="Casos Anuales",
+                    text=df_totales_anuales["casos_totales"],
                     textposition="top center",
-                    textfont=dict(size=12, color="#ffffff"),
+                    textfont=dict(size=12, color="#ffffff", weight="bold"),
                     line=dict(
-                        shape="spline", smoothing=1.3, width=3, color="#ff7f0e"
+                        shape="spline", smoothing=1.2, width=3, color="#ff7f0e"
                     ),
-                    marker=dict(size=7, color="#ff7f0e"),
+                    marker=dict(size=8, color="#ff7f0e"),
                     fill="tozeroy",
-                    fillcolor="rgba(255, 127, 14, 0.3)",
+                    fillcolor="rgba(255, 127, 14, 0.15)",
+                )
+            )
+
+            # Línea de Referencia: Promedio Histórico Total (Azul Cian)
+            fig_hist.add_trace(
+                go.Scatter(
+                    x=df_totales_anuales["año"],
+                    y=[promedio_total] * len(df_totales_anuales),
+                    mode="lines",
+                    name=f"Prom. Histórico Total ({int(promedio_total):,})",
+                    line=dict(color="#00ffff", width=2, dash="dash"),
+                )
+            )
+
+            # Línea de Referencia: Promedio Últimos 5 Años (Verde Neón)
+            fig_hist.add_trace(
+                go.Scatter(
+                    x=df_totales_anuales["año"],
+                    y=[promedio_5_anios] * len(df_totales_anuales),
+                    mode="lines",
+                    name=f"Prom. Últimos 5 Años ({int(promedio_5_anios):,})",
+                    line=dict(color="#00ff66", width=2, dash="dot"),
+                )
+            )
+
+            # Línea de Referencia: Promedio Últimos 10 Años (Amarillo Dorado)
+            fig_hist.add_trace(
+                go.Scatter(
+                    x=df_totales_anuales["año"],
+                    y=[promedio_10_anios] * len(df_totales_anuales),
+                    mode="lines",
+                    name=f"Prom. Últimos 10 Años ({int(promedio_10_anios):,})",
+                    line=dict(color="#ffcc00", width=2, dash="dashdot"),
                 )
             )
 
             fig_hist.update_layout(
-                title=f"COMPARATIVO DE {titulo_evento.upper()} (ANUAL)",
+                title=f"TENDENCIA ANUAL DE {titulo_evento.upper()} VS. PROMEDIOS HISTÓRICOS",
                 xaxis_title="Año",
                 yaxis_title="Casos Totales",
                 template="plotly_dark",
@@ -597,6 +640,9 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 height=340,
                 margin=dict(l=10, r=10, t=40, b=10),
                 xaxis=dict(type="category"),
+                legend=dict(
+                    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                ),
             )
             st.plotly_chart(
                 fig_hist, use_container_width=True, config=config_plotly
