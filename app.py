@@ -227,21 +227,40 @@ else:
     )
 
 
-# FUNCIÓN RENDERIZADORA REUTILIZABLE PARA DASHBOARDS
+# FUNCIÓN RENDERIZADORA REUTILIZABLE PARA DASHBOARDS (CON PROTECCIÓN ANTI-BLANK/NaN)
 def renderizar_dashboard(df, titulo_evento, key_prefix):
+    if df.empty or "año" not in df.columns:
+        st.warning(
+            f"⚠️ El conjunto de datos de {titulo_evento} está vacío o no tiene la columna 'año'."
+        )
+        return
+
     max_anio_data = int(df["año"].max())
     df_max_anio = df[df["año"] == max_anio_data]
 
-    max_semana_real_data = (
-        int(df_max_anio[df_max_anio["casos_totales"] > 0]["semana"].max())
-        if not df_max_anio.empty
-        else 1
-    )
-    max_mes_num_real_data = (
-        int(df_max_anio[df_max_anio["casos_totales"] > 0]["mes_num"].max())
-        if not df_max_anio.empty
-        else 1
-    )
+    # Filtrado seguro para evitar ValueError si no hay registros mayores a cero
+    df_con_casos = df_max_anio[df_max_anio["casos_totales"] > 0]
+
+    if not df_con_casos.empty and pd.notna(df_con_casos["semana"].max()):
+        max_semana_real_data = int(df_con_casos["semana"].max())
+    else:
+        max_semana_val = (
+            df_max_anio["semana"].max() if not df_max_anio.empty else 1
+        )
+        max_semana_real_data = (
+            int(max_semana_val) if pd.notna(max_semana_val) else 1
+        )
+
+    if not df_con_casos.empty and pd.notna(df_con_casos["mes_num"].max()):
+        max_mes_num_real_data = int(df_con_casos["mes_num"].max())
+    else:
+        max_mes_val = (
+            df_max_anio["mes_num"].max() if not df_max_anio.empty else 1
+        )
+        max_mes_num_real_data = int(max_mes_val) if pd.notna(max_mes_val) else 1
+
+    # Rango del mes entre 1 y 12
+    max_mes_num_real_data = max(1, min(12, max_mes_num_real_data))
 
     orden_meses = [
         "Enero",
@@ -658,14 +677,13 @@ if modulo_seleccionado == "🌡️ Febriles":
 elif modulo_seleccionado == "🫁 IRAS":
     df = cargar_datos_csv("iras_consolidado.csv", col_total_casos="feb_tot")
     if df is None:
-        # Intenta cargar alternativas comunes si el nombre varia ligeramente
         if os.path.exists("iras.csv"):
             df = cargar_datos_csv("iras.csv")
 
     if df is None:
         st.warning(
             "⚠️ Aún no se detecta el archivo `iras_consolidado.csv` en el repositorio. "
-            "Por favor, asegúrate de subirlo con ese nombre exacto a la raíz del repositorio de GitHub."
+            "Asegúrate de subirlo con ese nombre exacto a la raíz de tu repositorio de GitHub."
         )
     else:
         renderizar_dashboard(df, titulo_evento="IRAS", key_prefix="iras")
