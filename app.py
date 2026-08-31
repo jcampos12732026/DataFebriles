@@ -235,14 +235,13 @@ def renderizar_grafico_grupos_etarios(df, key_prefix):
         )
         df_et_melted["año_str"] = df_et_melted["año"].astype(str)
 
-        # Construcción de paleta dinámica estilo Febriles: Azul para años anteriores y Rojo para el año más reciente
         anios_seleccionados_ordenados = sorted(df_et_sum["año"].unique())
         colores_base = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
         mapa_colores = {}
 
         for idx, anio in enumerate(anios_seleccionados_ordenados):
             if anio == max(anios_seleccionados_ordenados):
-                mapa_colores[str(anio)] = "#D90429"  # Rojo para el último año
+                mapa_colores[str(anio)] = "#D90429"
             else:
                 mapa_colores[str(anio)] = colores_base[idx % len(colores_base)]
 
@@ -356,8 +355,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             )
 
         df_g1 = df[df["año"].isin(anios_g1)].copy()
-        if incluye_anio_actual_g1 and corte_acumulado_g1:
-            df_g1 = df_g1[df_g1["semana"] <= max_semana_real_data]
 
         if not df_g1.empty:
             df_sem = (
@@ -372,49 +369,53 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             )
 
             df_sem = df_sem.sort_values(by="semana")
-            colores_barras_inst = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
+            colores_lineas = ["#0088CC", "#4A90E2", "#6C757D"]
 
-            for idx, anio in enumerate(anios_en_datos):
+            # 1. Años anteriores como líneas (Estilo Excel)
+            idx_linea = 0
+            for anio in anios_en_datos:
                 if anio != max_anio_presente:
                     df_anio = df_sem[df_sem["año"] == anio]
                     fig_sem.add_trace(
-                        go.Bar(
+                        go.Scatter(
                             x=df_anio["semana"],
                             y=df_anio["casos_totales"],
                             name=str(anio),
-                            marker_color=colores_barras_inst[
-                                idx % len(colores_barras_inst)
-                            ],
-                            opacity=0.8,
+                            mode="lines+markers+text",
                             text=df_anio["casos_totales"],
-                            textposition="auto",
-                            textfont=dict(size=12, color="white"),
+                            textposition="top center",
+                            textfont=dict(size=11, color="#00CCFF"),
+                            line=dict(
+                                width=2.5,
+                                color=colores_lineas[
+                                    idx_linea % len(colores_lineas)
+                                ],
+                            ),
+                            marker=dict(
+                                size=6, symbol="circle-open", width=2
+                            ),
                         )
                     )
+                    idx_linea += 1
 
+            # 2. Año actual como Barras (Estilo Excel)
             if max_anio_presente in anios_en_datos:
-                df_ultimo = df_sem[df_sem["año"] == max_anio_presente]
+                df_ultimo = df_sem[df_sem["año"] == max_anio_presente].copy()
+                if corte_acumulado_g1:
+                    df_ultimo = df_ultimo[
+                        df_ultimo["semana"] <= max_semana_real_data
+                    ]
+
                 fig_sem.add_trace(
-                    go.Scatter(
+                    go.Bar(
                         x=df_ultimo["semana"],
                         y=df_ultimo["casos_totales"],
                         name=f"{max_anio_presente} (Actual)",
-                        mode="lines+markers+text",
+                        marker_color="#D90429",
+                        opacity=0.85,
                         text=df_ultimo["casos_totales"],
-                        textposition="top center",
-                        textfont=dict(
-                            size=13,
-                            color="#D90429",
-                            family="sans-serif",
-                            weight="bold",
-                        ),
-                        line=dict(
-                            shape="spline",
-                            smoothing=0.8,
-                            width=3.5,
-                            color="#D90429",
-                        ),
-                        marker=dict(size=8, color="#D90429"),
+                        textposition="auto",
+                        textfont=dict(size=12, color="white", weight="bold"),
                     )
                 )
 
@@ -425,15 +426,20 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             )
             fig_sem.update_layout(
                 title=f"TOTAL DE EPISODIOS SEMANALES DE {titulo_evento.upper()}{texto_corte_titulo_g1}",
-                xaxis_title="N° de Semana",
+                xaxis_title="N° de Semana Epidemiológica",
                 yaxis_title="Casos",
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                height=340,
+                height=360,
                 margin=dict(l=10, r=10, t=40, b=10),
-                xaxis=dict(type="category"),
-                barmode="group",
+                xaxis=dict(
+                    type="category",
+                    categoryorder="array",
+                    categoryarray=list(range(1, 54)),
+                    dtick=1,
+                ),
+                barmode="overlay",
                 legend=dict(
                     orientation="v", yanchor="top", y=1, xanchor="left", x=1.02
                 ),
@@ -559,7 +565,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                height=340,
+                height=360,
                 margin=dict(l=10, r=10, t=40, b=10),
                 barmode="group",
                 legend=dict(
