@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 2. Estilos CSS personalizados
+# 2. Estilos CSS con Identidad Institucional MINSA
 st.markdown(
     """
     <style>
@@ -22,7 +22,7 @@ st.markdown(
     div[data-testid="stStatusWidget"] {visibility: hidden;}
 
     .stApp {
-        background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+        background: radial-gradient(ellipse at bottom, #0d1b2a 0%, #080d1a 100%);
         color: #ffffff;
     }
 
@@ -37,16 +37,16 @@ st.markdown(
     [data-testid="stSidebar"] {
         width: 290px !important;
         min-width: 290px !important;
-        background-color: #0d131d !important;
+        background-color: #060a12 !important;
     }
 
     .unified-card-header {
-        background: linear-gradient(145deg, #151c28, #1a2436);
+        background: linear-gradient(145deg, #002244, #003366);
         border: 2px solid #0056b3;
         border-radius: 10px;
         padding: 14px 10px;
         text-align: center;
-        box-shadow: 0px 4px 12px rgba(0, 86, 179, 0.3);
+        box-shadow: 0px 4px 12px rgba(0, 86, 179, 0.4);
         margin-bottom: 15px;
     }
 
@@ -92,7 +92,7 @@ meses_nombre = {
 }
 
 
-# 4. Carga y procesamiento genérico de datasets
+# 4. Carga y procesamiento de datos
 def cargar_datos_csv(nombre_archivo, col_total_casos=None):
     if not os.path.exists(nombre_archivo):
         return None
@@ -158,7 +158,7 @@ with st.sidebar:
     st.markdown(
         f"""
         <div class="unified-card-header">
-            <h4 style="margin:0; color:#4da6ff; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Actual</h4>
+            <h4 style="margin:0; color:#00CCFF; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Actual</h4>
             <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">SE {semana_epidemiologica_actual}</h1>
             <p style="margin:4px 0 0 0; color:#ffffff; font-size: 16px; font-weight: 700;">Año: {hoy.year}</p>
         </div>
@@ -240,7 +240,7 @@ def renderizar_grafico_grupos_etarios(df, key_prefix):
             text="Casos",
             template="plotly_dark",
             labels={"año_str": "Año", "Grupo Etario": "Grupo de Edad"},
-            color_discrete_sequence=px.colors.qualitative.Bold,
+            color_discrete_sequence=["#0056B3", "#00CCFF", "#D90429"],
         )
 
         fig_et.update_traces(textposition="auto", textfont_size=13)
@@ -355,14 +355,10 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             max_anio_presente = (
                 max(anios_en_datos) if anios_en_datos else max_anio_data
             )
-            colores_barras = [
-                "#636EFA",
-                "#00CC96",
-                "#AB63FA",
-                "#FFA15A",
-                "#19D3F3",
-            ]
 
+            colores_barras_inst = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
+
+            # Años anteriores -> BARRAS INSTITUCIONALES
             for idx, anio in enumerate(anios_en_datos):
                 if anio != max_anio_presente:
                     df_anio = df_sem[df_sem["año"] == anio].sort_values(
@@ -373,16 +369,17 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                             x=df_anio["semana"],
                             y=df_anio["casos_totales"],
                             name=str(anio),
-                            marker_color=colores_barras[
-                                idx % len(colores_barras)
+                            marker_color=colores_barras_inst[
+                                idx % len(colores_barras_inst)
                             ],
-                            opacity=0.75,
+                            opacity=0.8,
                             text=df_anio["casos_totales"],
                             textposition="auto",
-                            textfont=dict(size=13, color="white"),
+                            textfont=dict(size=12, color="white"),
                         )
                     )
 
+            # Último año (Actual) -> LÍNEA SUAVIZADA ROJA ALERTA MINSA
             if max_anio_presente in anios_en_datos:
                 df_ultimo = df_sem[df_sem["año"] == max_anio_presente].sort_values(
                     "semana"
@@ -396,8 +393,8 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                         text=df_ultimo["casos_totales"],
                         textposition="top center",
                         textfont=dict(
-                            size=14,
-                            color="#FF3333",
+                            size=13,
+                            color="#D90429",
                             family="sans-serif",
                             weight="bold",
                         ),
@@ -405,9 +402,9 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                             shape="spline",
                             smoothing=1.3,
                             width=4,
-                            color="#FF3333",
+                            color="#D90429",
                         ),
-                        marker=dict(size=8, color="#FF3333"),
+                        marker=dict(size=8, color="#D90429"),
                     )
                 )
 
@@ -491,13 +488,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             )
 
             fig_mes = go.Figure()
-            colores_barras = [
-                "#636EFA",
-                "#00CC96",
-                "#AB63FA",
-                "#FFA15A",
-                "#19D3F3",
-            ]
+            colores_barras_inst = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
 
             for idx, anio in enumerate(anios_seleccionados_ordenados):
                 if anio != max_anio_mes:
@@ -507,10 +498,10 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                             x=df_anio_m["mes_nom"],
                             y=df_anio_m["casos_totales"],
                             name=str(anio),
-                            marker_color=colores_barras[
-                                idx % len(colores_barras)
+                            marker_color=colores_barras_inst[
+                                idx % len(colores_barras_inst)
                             ],
-                            opacity=0.75,
+                            opacity=0.8,
                             text=df_anio_m["casos_totales"],
                             textposition="auto",
                             textfont=dict(size=12, color="white"),
@@ -529,7 +520,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                         textposition="top center",
                         textfont=dict(
                             size=13,
-                            color="#FF3333",
+                            color="#D90429",
                             family="sans-serif",
                             weight="bold",
                         ),
@@ -537,9 +528,9 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                             shape="spline",
                             smoothing=1.3,
                             width=4,
-                            color="#FF3333",
+                            color="#D90429",
                         ),
-                        marker=dict(size=8, color="#FF3333"),
+                        marker=dict(size=8, color="#D90429"),
                     )
                 )
 
@@ -571,7 +562,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
 
     st.divider()
 
-    # FILA 2: Evolución Anual & Comparativo Semanal de la SE 1 a la SE Actual
+    # FILA 2: Evolución Anual & Comparativo Específico
     col_hist, col_right = st.columns([1.8, 1])
 
     with col_hist:
@@ -625,17 +616,17 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     textposition=posiciones_texto,
                     textfont=dict(size=12, color="#ffffff", weight="bold"),
                     fill="tozeroy",
-                    fillcolor="rgba(255, 102, 0, 0.22)",
+                    fillcolor="rgba(0, 86, 179, 0.25)",
                     line=dict(
                         shape="spline",
                         smoothing=1.3,
                         width=4,
-                        color="#FF6600",
+                        color="#00CCFF",
                     ),
                     marker=dict(
                         size=9,
                         color="#FFFFFF",
-                        line=dict(width=3, color="#FF6600"),
+                        line=dict(width=3, color="#0056B3"),
                     ),
                 )
             )
@@ -646,7 +637,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     y=[promedio_total, promedio_total],
                     mode="lines",
                     name=f"Prom. Histórico Total ({int(promedio_total):,})",
-                    line=dict(color="#00F0FF", width=2.5, dash="dash"),
+                    line=dict(color="#00FF66", width=2.5, dash="dash"),
                 )
             )
 
@@ -666,7 +657,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     y=[promedio_5_anios, promedio_5_anios],
                     mode="lines",
                     name=f"Prom. Últimos 5 Años ({int(promedio_5_anios):,})",
-                    line=dict(color="#00FF66", width=3, dash="solid"),
+                    line=dict(color="#D90429", width=3, dash="solid"),
                 )
             )
 
@@ -684,10 +675,10 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 x=anio_inicio_5,
                 line_width=2,
                 line_dash="dashdot",
-                line_color="#00FF66",
+                line_color="#D90429",
                 annotation_text="Inicio U5A",
                 annotation_position="top left",
-                annotation_font=dict(color="#00FF66", size=11, weight="bold"),
+                annotation_font=dict(color="#D90429", size=11, weight="bold"),
             )
 
             max_valor_y = max(
@@ -726,80 +717,153 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 fig_hist, use_container_width=True, config=config_plotly
             )
 
-    # NUEVO COMPORTAMIENTO: Comparativo Semanal Completo (SE 1 a SE corte)
+    # COLUMNA DERECHA: Diferenciada según el Módulo (Febriles mantiene 2 semanas / IRAS compara acumulado)
     with col_right:
-        st.subheader("📊 Comparativo Semanal Acumulado")
+        if key_prefix == "febriles":
+            st.subheader("📈 Comparativo Últimas Semanas")
 
-        col_c1, col_c2 = st.columns([1.5, 1])
-        with col_c1:
             anios_g2 = st.multiselect(
-                "Año(s) - Comparativo:",
+                "Seleccionar Año(s) - Últimas Semanas:",
                 anios_disponibles,
                 default=ultimos_dos_anios,
                 key=f"{key_prefix}_g2_anios",
             )
-        with col_c2:
-            st.markdown(
-                "<div style='height: 22px;'></div>", unsafe_allow_html=True
+
+            semanas_disponibles_data = sorted(
+                df_max_anio[df_max_anio["casos_totales"] > 0]["semana"].unique()
             )
-            incluye_anio_actual_g2 = max_anio_data in anios_g2
-            label_chk_g2 = f"Recortar hasta SE {max_semana_real_data} ({max_anio_data})"
-            corte_acumulado_g2 = st.checkbox(
-                label_chk_g2,
-                value=True if incluye_anio_actual_g2 else False,
-                disabled=not incluye_anio_actual_g2,
-                key=f"{key_prefix}_chk_corte_g2",
-            )
+            if len(semanas_disponibles_data) >= 2:
+                semanas_ultimas = [
+                    semanas_disponibles_data[-2],
+                    semanas_disponibles_data[-1],
+                ]
+            elif len(semanas_disponibles_data) == 1:
+                semanas_ultimas = [semanas_disponibles_data[0]]
+            else:
+                semanas_ultimas = [semana_epidemiologica_actual]
 
-        df_comp_base = df[df["año"].isin(anios_g2)].copy()
+            df_comp_data = df[
+                (df["año"].isin(anios_g2))
+                & (df["semana"].isin(semanas_ultimas))
+            ].copy()
+            df_comp_data["año_str"] = df_comp_data["año"].astype(str)
 
-        if incluye_anio_actual_g2 and corte_acumulado_g2:
-            df_comp_base = df_comp_base[
-                df_comp_base["semana"] <= max_semana_real_data
-            ]
+            if not df_comp_data.empty:
+                df_comp = (
+                    df_comp_data.groupby(["semana", "año_str"])[
+                        "casos_totales"
+                    ]
+                    .sum()
+                    .reset_index()
+                )
+                fig_ult = px.bar(
+                    df_comp,
+                    x="semana",
+                    y="casos_totales",
+                    color="año_str",
+                    barmode="group",
+                    text="casos_totales",
+                    template="plotly_dark",
+                    title=f"Semanas {' y '.join(map(str, semanas_ultimas))}",
+                    labels={
+                        "semana": "N° de Semana",
+                        "casos_totales": "Casos",
+                        "año_str": "Año",
+                    },
+                    color_discrete_sequence=["#0056B3", "#D90429"],
+                )
+                fig_ult.update_traces(textfont_size=13, textposition="auto")
+                fig_ult.update_xaxes(type="category")
+                fig_ult.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    height=380,
+                    margin=dict(l=10, r=10, t=50, b=10),
+                )
+                st.plotly_chart(
+                    fig_ult, use_container_width=True, config=config_plotly
+                )
 
-        if not df_comp_base.empty:
-            df_comp = (
-                df_comp_base.groupby(["semana", "año"])["casos_totales"]
-                .sum()
-                .reset_index()
-            )
-            df_comp["año_str"] = df_comp["año"].astype(str)
+        else:
+            # Módulo IRAS: Comparativo Semanal Acumulado (SE 1 a SE corte)
+            st.subheader("📊 Comparativo Semanal Acumulado")
 
-            fig_ult = px.bar(
-                df_comp,
-                x="semana",
-                y="casos_totales",
-                color="año_str",
-                barmode="group",
-                text="casos_totales",
-                template="plotly_dark",
-                labels={
-                    "semana": "N° de Semana",
-                    "casos_totales": "Casos",
-                    "año_str": "Año",
-                },
-                color_discrete_sequence=px.colors.qualitative.Bold,
-            )
+            col_c1, col_c2 = st.columns([1.5, 1])
+            with col_c1:
+                anios_g2 = st.multiselect(
+                    "Año(s) - Comparativo:",
+                    anios_disponibles,
+                    default=ultimos_dos_anios,
+                    key=f"{key_prefix}_g2_anios",
+                )
+            with col_c2:
+                st.markdown(
+                    "<div style='height: 22px;'></div>", unsafe_allow_html=True
+                )
+                incluye_anio_actual_g2 = max_anio_data in anios_g2
+                label_chk_g2 = (
+                    f"Recortar hasta SE {max_semana_real_data} ({max_anio_data})"
+                )
+                corte_acumulado_g2 = st.checkbox(
+                    label_chk_g2,
+                    value=True if incluye_anio_actual_g2 else False,
+                    disabled=not incluye_anio_actual_g2,
+                    key=f"{key_prefix}_chk_corte_g2",
+                )
 
-            fig_ult.update_traces(textfont_size=12, textposition="auto")
-            fig_ult.update_xaxes(type="category")
+            df_comp_base = df[df["año"].isin(anios_g2)].copy()
 
-            rango_semanas_texto = f"Semanas 1 a {max_semana_real_data}"
+            if incluye_anio_actual_g2 and corte_acumulado_g2:
+                df_comp_base = df_comp_base[
+                    df_comp_base["semana"] <= max_semana_real_data
+                ]
 
-            fig_ult.update_layout(
-                title=f"COMPARATIVO SEMANAL ({rango_semanas_texto.upper()})",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                height=380,
-                margin=dict(l=10, r=10, t=50, b=10),
-                legend=dict(
-                    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
-                ),
-            )
-            st.plotly_chart(
-                fig_ult, use_container_width=True, config=config_plotly
-            )
+            if not df_comp_base.empty:
+                df_comp = (
+                    df_comp_base.groupby(["semana", "año"])["casos_totales"]
+                    .sum()
+                    .reset_index()
+                )
+                df_comp["año_str"] = df_comp["año"].astype(str)
+
+                fig_ult = px.bar(
+                    df_comp,
+                    x="semana",
+                    y="casos_totales",
+                    color="año_str",
+                    barmode="group",
+                    text="casos_totales",
+                    template="plotly_dark",
+                    labels={
+                        "semana": "N° de Semana",
+                        "casos_totales": "Casos",
+                        "año_str": "Año",
+                    },
+                    color_discrete_sequence=["#0056B3", "#00CCFF", "#D90429"],
+                )
+
+                fig_ult.update_traces(textfont_size=12, textposition="auto")
+                fig_ult.update_xaxes(type="category")
+
+                rango_semanas_texto = f"Semanas 1 a {max_semana_real_data}"
+
+                fig_ult.update_layout(
+                    title=f"COMPARATIVO SEMANAL ({rango_semanas_texto.upper()})",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    height=380,
+                    margin=dict(l=10, r=10, t=50, b=10),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1,
+                    ),
+                )
+                st.plotly_chart(
+                    fig_ult, use_container_width=True, config=config_plotly
+                )
 
     if key_prefix == "iras":
         st.divider()
