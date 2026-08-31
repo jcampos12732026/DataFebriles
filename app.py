@@ -105,37 +105,50 @@ def obtener_semana_epidemiologica(fecha):
     return semana
 
 
-# Carga directa de datos de Febriles
-def cargar_datos_febriles():
-    if not os.path.exists("febriles_consolidado.csv"):
+# Diccionario de meses
+meses_nombre = {
+    1: "Enero",
+    2: "Febrero",
+    3: "Marzo",
+    4: "Abril",
+    5: "Mayo",
+    6: "Junio",
+    7: "Julio",
+    8: "Agosto",
+    9: "Setiembre",
+    10: "Octubre",
+    11: "Noviembre",
+    12: "Diciembre",
+}
+
+
+# Carga genérica para datasets (Febriles / IRAS)
+def cargar_datos_csv(nombre_archivo, col_total_casos="feb_tot"):
+    if not os.path.exists(nombre_archivo):
         return None
-    df = pd.read_csv("febriles_consolidado.csv")
+    df = pd.read_csv(nombre_archivo)
     df.columns = df.columns.str.strip().str.lower()
 
     if "ano" in df.columns:
         df = df.rename(columns={"ano": "año"})
 
-    for col in ["feb_tot", "tot_aten", "semana", "año", "mes"]:
+    # Detectar columna de total de casos si variara en IRAS
+    if col_total_casos not in df.columns:
+        posibles_cols = [
+            c
+            for c in df.columns
+            if "tot" in c or "ira" in c or "casos" in c or "num" in c
+        ]
+        if posibles_cols:
+            col_total_casos = posibles_cols[0]
+
+    cols_a_convertir = [col_total_casos, "semana", "año", "mes"]
+    for col in cols_a_convertir:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     df["año"] = df["año"].astype(int)
     df["semana"] = df["semana"].astype(int)
-
-    meses_nombre = {
-        1: "Enero",
-        2: "Febrero",
-        3: "Marzo",
-        4: "Abril",
-        5: "Mayo",
-        6: "Junio",
-        7: "Julio",
-        8: "Agosto",
-        9: "Setiembre",
-        10: "Octubre",
-        11: "Noviembre",
-        12: "Diciembre",
-    }
 
     if "mes" in df.columns:
         df["mes_num"] = df["mes"].astype(int)
@@ -150,6 +163,9 @@ def cargar_datos_febriles():
         )
         df["mes_nom"] = df["mes_num"].map(meses_nombre)
 
+    df["casos_totales"] = (
+        df[col_total_casos] if col_total_casos in df.columns else 0
+    )
     return df
 
 
@@ -175,10 +191,9 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # SELECTOR PARA ESCALAR A FUTUROS MÓDULOS
     modulo_seleccionado = st.radio(
         "Seleccionar Módulo:",
-        ["🌡️ Febriles", "🫁 IRAS (Próximamente)", "🦟 Dengue (Próximamente)"],
+        ["🌡️ Febriles", "🫁 IRAS", "🦟 Dengue (Próximamente)"],
         index=0,
     )
 
@@ -189,7 +204,7 @@ with st.sidebar:
     )
     st.info("Módulos independientes operativos.")
 
-    # --- BANNER DE HOMENAJE EN LA BARRA LATERAL ---
+    # --- BANNER DE HOMENAJE ---
     st.markdown(
         """
         <div class="homenaje-banner-sidebar">
@@ -202,7 +217,7 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-# --- ÁREA PRINCIPAL ---
+# --- CABECERA PRINCIPAL ---
 if os.path.exists("logo_minsa.png"):
     st.image("logo_minsa.png", use_container_width=True)
 else:
@@ -211,461 +226,449 @@ else:
         unsafe_allow_html=True,
     )
 
-# MOSTRAR CONTENIDO SEGÚN MÓDULO SELECCIONADO
-if modulo_seleccionado == "🌡️ Febriles":
-    try:
-        df = cargar_datos_febriles()
 
-        if df is None:
-            st.error(
-                "⚠️ No se encontró el archivo `febriles_consolidado.csv`. Por favor verifica que esté presente en la raíz del proyecto."
+# FUNCIÓN RENDERIZADORA REUTILIZABLE PARA DASHBOARDS
+def renderizar_dashboard(df, titulo_evento, key_prefix):
+    max_anio_data = int(df["año"].max())
+    df_max_anio = df[df["año"] == max_anio_data]
+
+    max_semana_real_data = (
+        int(df_max_anio[df_max_anio["casos_totales"] > 0]["semana"].max())
+        if not df_max_anio.empty
+        else 1
+    )
+    max_mes_num_real_data = (
+        int(df_max_anio[df_max_anio["casos_totales"] > 0]["mes_num"].max())
+        if not df_max_anio.empty
+        else 1
+    )
+
+    orden_meses = [
+        "Enero",
+        "Febrero",
+        "Marzo",
+        "Abril",
+        "Mayo",
+        "Junio",
+        "Julio",
+        "Agosto",
+        "Setiembre",
+        "Octubre",
+        "Noviembre",
+        "Diciembre",
+    ]
+    max_mes_nombre_real_data = orden_meses[max_mes_num_real_data - 1]
+
+    anios_disponibles = sorted(df["año"].unique())
+    ultimos_dos_anios = (
+        anios_disponibles[-2:]
+        if len(anios_disponibles) >= 2
+        else anios_disponibles
+    )
+
+    # ==========================================
+    # FILA 1: Episodios Semanales y Mensualizados
+    # ==========================================
+    col_mid, col_mes = st.columns([1.8, 1])
+
+    with col_mid:
+        st.subheader(f"📊 Episodios Semanales de {titulo_evento}")
+
+        col_f1, col_f2 = st.columns([1.5, 1])
+        with col_f1:
+            anios_g1 = st.multiselect(
+                "Seleccionar Año(s) - Semanal:",
+                anios_disponibles,
+                default=ultimos_dos_anios,
+                key=f"{key_prefix}_g1_anios",
             )
-        else:
-            max_anio_data = int(df["año"].max())
-            df_max_anio = df[df["año"] == max_anio_data]
-
-            max_semana_real_data = (
-                int(df_max_anio[df_max_anio["feb_tot"] > 0]["semana"].max())
-                if not df_max_anio.empty
-                else 1
+        with col_f2:
+            st.markdown(
+                "<div style='height: 22px;'></div>", unsafe_allow_html=True
+            )
+            incluye_anio_actual_g1 = max_anio_data in anios_g1
+            label_chk_g1 = f"Acumulado hasta SE {max_semana_real_data} ({max_anio_data})"
+            corte_acumulado_g1 = st.checkbox(
+                label_chk_g1,
+                value=True if incluye_anio_actual_g1 else False,
+                disabled=not incluye_anio_actual_g1,
+                key=f"{key_prefix}_chk_corte_g1",
             )
 
-            max_mes_num_real_data = (
-                int(df_max_anio[df_max_anio["feb_tot"] > 0]["mes_num"].max())
-                if not df_max_anio.empty
-                else 1
-            )
+        df_g1 = df[df["año"].isin(anios_g1)].copy()
+        if incluye_anio_actual_g1 and corte_acumulado_g1:
+            df_g1 = df_g1[df_g1["semana"] <= max_semana_real_data]
 
-            orden_meses = [
-                "Enero",
-                "Febrero",
-                "Marzo",
-                "Abril",
-                "Mayo",
-                "Junio",
-                "Julio",
-                "Agosto",
-                "Setiembre",
-                "Octubre",
-                "Noviembre",
-                "Diciembre",
+        if not df_g1.empty:
+            df_sem = (
+                df_g1.groupby(["semana", "año"])["casos_totales"]
+                .sum()
+                .reset_index()
+            )
+            fig_sem = go.Figure()
+            anios_en_datos = sorted(df_sem["año"].unique())
+            max_anio_presente = (
+                max(anios_en_datos) if anios_en_datos else max_anio_data
+            )
+            colores_barras = [
+                "#636EFA",
+                "#00CC96",
+                "#AB63FA",
+                "#FFA15A",
+                "#19D3F3",
             ]
-            max_mes_nombre_real_data = orden_meses[max_mes_num_real_data - 1]
 
-            anios_disponibles = sorted(df["año"].unique())
-            ultimos_dos_anios = (
-                anios_disponibles[-2:]
-                if len(anios_disponibles) >= 2
-                else anios_disponibles
+            for idx, anio in enumerate(anios_en_datos):
+                if anio != max_anio_presente:
+                    df_anio = df_sem[df_sem["año"] == anio].sort_values(
+                        "semana"
+                    )
+                    fig_sem.add_trace(
+                        go.Bar(
+                            x=df_anio["semana"],
+                            y=df_anio["casos_totales"],
+                            name=str(anio),
+                            marker_color=colores_barras[
+                                idx % len(colores_barras)
+                            ],
+                            opacity=0.75,
+                            text=df_anio["casos_totales"],
+                            textposition="auto",
+                            textfont=dict(size=13, color="white"),
+                        )
+                    )
+
+            if max_anio_presente in anios_en_datos:
+                df_ultimo = df_sem[df_sem["año"] == max_anio_presente].sort_values(
+                    "semana"
+                )
+                fig_sem.add_trace(
+                    go.Scatter(
+                        x=df_ultimo["semana"],
+                        y=df_ultimo["casos_totales"],
+                        name=f"{max_anio_presente} (Actual)",
+                        mode="lines+markers+text",
+                        text=df_ultimo["casos_totales"],
+                        textposition="top center",
+                        textfont=dict(
+                            size=14,
+                            color="#FF3333",
+                            family="sans-serif",
+                            weight="bold",
+                        ),
+                        line=dict(
+                            shape="spline",
+                            smoothing=1.3,
+                            width=4,
+                            color="#FF3333",
+                        ),
+                        marker=dict(size=8, color="#FF3333"),
+                    )
+                )
+
+            texto_corte_titulo_g1 = (
+                f" (HASTA SE {max_semana_real_data})"
+                if (incluye_anio_actual_g1 and corte_acumulado_g1)
+                else " (AÑOS COMPLETOS)"
+            )
+            fig_sem.update_layout(
+                title=f"TOTAL DE EPISODIOS SEMANALES DE {titulo_evento.upper()}{texto_corte_titulo_g1}",
+                xaxis_title="N° de Semana",
+                yaxis_title="Casos",
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=340,
+                margin=dict(l=10, r=10, t=40, b=10),
+                xaxis=dict(type="category"),
+                barmode="group",
+                legend=dict(
+                    orientation="v", yanchor="top", y=1, xanchor="left", x=1.02
+                ),
+            )
+            st.plotly_chart(
+                fig_sem, use_container_width=True, config=config_plotly
             )
 
-            # ==========================================
-            # FILA 1: Episodios Semanales y Episodios Mensualizados
-            # ==========================================
-            col_mid, col_mes = st.columns([1.8, 1])
+    with col_mes:
+        st.subheader("📅 Episodios Mensualizados")
 
-            with col_mid:
-                st.subheader("📊 Episodios Semanales de Febriles")
+        col_m1, col_m2 = st.columns([1.5, 1])
+        with col_m1:
+            anios_mes_sel = st.multiselect(
+                "Año(s) - Mensual:",
+                anios_disponibles,
+                default=ultimos_dos_anios,
+                key=f"{key_prefix}_g3_anios",
+            )
+        with col_m2:
+            st.markdown(
+                "<div style='height: 22px;'></div>", unsafe_allow_html=True
+            )
+            incluye_anio_actual_m = max_anio_data in anios_mes_sel
+            label_chk_m = f"Acumulado hasta {max_mes_nombre_real_data} ({max_anio_data})"
+            corte_acumulado_m = st.checkbox(
+                label_chk_m,
+                value=True if incluye_anio_actual_m else False,
+                disabled=not incluye_anio_actual_m,
+                key=f"{key_prefix}_chk_corte_mes",
+            )
 
-                col_f1, col_f2 = st.columns([1.5, 1])
-                with col_f1:
-                    anios_g1 = st.multiselect(
-                        "Seleccionar Año(s) - Semanal:",
-                        anios_disponibles,
-                        default=ultimos_dos_anios,
-                        key="g1_anios",
-                    )
-                with col_f2:
-                    st.markdown(
-                        "<div style='height: 22px;'></div>",
-                        unsafe_allow_html=True,
-                    )
-                    incluye_anio_actual_g1 = max_anio_data in anios_g1
-                    label_chk_g1 = f"Acumulado hasta SE {max_semana_real_data} ({max_anio_data})"
-                    corte_acumulado_g1 = st.checkbox(
-                        label_chk_g1,
-                        value=True if incluye_anio_actual_g1 else False,
-                        disabled=not incluye_anio_actual_g1,
-                        key="chk_corte_g1",
-                    )
+        df_mes_base = df[df["año"].isin(anios_mes_sel)].copy()
+        if incluye_anio_actual_m and corte_acumulado_m:
+            df_mes_base = df_mes_base[
+                df_mes_base["mes_num"] <= max_mes_num_real_data
+            ]
 
-                df_g1 = df[df["año"].isin(anios_g1)].copy()
-                if incluye_anio_actual_g1 and corte_acumulado_g1:
-                    df_g1 = df_g1[df_g1["semana"] <= max_semana_real_data]
+        if not df_mes_base.empty:
+            df_mes = (
+                df_mes_base.groupby(["mes_nom", "mes_num", "año"])[
+                    "casos_totales"
+                ]
+                .sum()
+                .reset_index()
+            )
+            meses_a_mostrar = (
+                orden_meses[:max_mes_num_real_data]
+                if (incluye_anio_actual_m and corte_acumulado_m)
+                else orden_meses
+            )
+            df_mes["mes_nom"] = pd.Categorical(
+                df_mes["mes_nom"], categories=meses_a_mostrar, ordered=True
+            )
+            df_mes = df_mes.dropna(subset=["mes_nom"]).sort_values("mes_nom")
 
-                if not df_g1.empty:
-                    df_sem = (
-                        df_g1.groupby(["semana", "año"])["feb_tot"]
-                        .sum()
-                        .reset_index()
-                    )
-                    fig_sem = go.Figure()
-                    anios_en_datos = sorted(df_sem["año"].unique())
-                    max_anio_presente = (
-                        max(anios_en_datos)
-                        if anios_en_datos
-                        else max_anio_data
-                    )
-                    colores_barras = [
-                        "#636EFA",
-                        "#00CC96",
-                        "#AB63FA",
-                        "#FFA15A",
-                        "#19D3F3",
-                    ]
+            anios_seleccionados_ordenados = sorted(df_mes["año"].unique())
+            max_anio_mes = (
+                max(anios_seleccionados_ordenados)
+                if anios_seleccionados_ordenados
+                else None
+            )
 
-                    for idx, anio in enumerate(anios_en_datos):
-                        if anio != max_anio_presente:
-                            df_anio = df_sem[df_sem["año"] == anio].sort_values(
-                                "semana"
-                            )
-                            fig_sem.add_trace(
-                                go.Bar(
-                                    x=df_anio["semana"],
-                                    y=df_anio["feb_tot"],
-                                    name=str(anio),
-                                    marker_color=colores_barras[
-                                        idx % len(colores_barras)
-                                    ],
-                                    opacity=0.75,
-                                    text=df_anio["feb_tot"],
-                                    textposition="auto",
-                                    textfont=dict(size=13, color="white"),
-                                )
-                            )
+            fig_mes = go.Figure()
+            colores_barras = [
+                "#636EFA",
+                "#00CC96",
+                "#AB63FA",
+                "#FFA15A",
+                "#19D3F3",
+            ]
 
-                    if max_anio_presente in anios_en_datos:
-                        df_ultimo = df_sem[
-                            df_sem["año"] == max_anio_presente
-                        ].sort_values("semana")
-                        fig_sem.add_trace(
-                            go.Scatter(
-                                x=df_ultimo["semana"],
-                                y=df_ultimo["feb_tot"],
-                                name=f"{max_anio_presente} (Actual)",
-                                mode="lines+markers+text",
-                                text=df_ultimo["feb_tot"],
-                                textposition="top center",
-                                textfont=dict(
-                                    size=14,
-                                    color="#FF3333",
-                                    family="sans-serif",
-                                    weight="bold",
-                                ),
-                                line=dict(
-                                    shape="spline",
-                                    smoothing=1.3,
-                                    width=4,
-                                    color="#FF3333",
-                                ),
-                                marker=dict(size=8, color="#FF3333"),
-                            )
+            for idx, anio in enumerate(anios_seleccionados_ordenados):
+                if anio != max_anio_mes:
+                    df_anio_m = df_mes[df_mes["año"] == anio]
+                    fig_mes.add_trace(
+                        go.Bar(
+                            x=df_anio_m["mes_nom"],
+                            y=df_anio_m["casos_totales"],
+                            name=str(anio),
+                            marker_color=colores_barras[
+                                idx % len(colores_barras)
+                            ],
+                            opacity=0.75,
+                            text=df_anio_m["casos_totales"],
+                            textposition="auto",
+                            textfont=dict(size=12, color="white"),
                         )
-
-                    texto_corte_titulo_g1 = (
-                        f" (HASTA SE {max_semana_real_data})"
-                        if (incluye_anio_actual_g1 and corte_acumulado_g1)
-                        else " (AÑOS COMPLETOS)"
                     )
-                    fig_sem.update_layout(
-                        title=f"TOTAL DE EPISODIOS SEMANALES DE FEBRILES{texto_corte_titulo_g1}",
-                        xaxis_title="N° de Semana",
-                        yaxis_title="Casos",
-                        template="plotly_dark",
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        height=340,
-                        margin=dict(l=10, r=10, t=40, b=10),
-                        xaxis=dict(type="category"),
-                        barmode="group",
-                        legend=dict(
-                            orientation="v",
-                            yanchor="top",
-                            y=1,
-                            xanchor="left",
-                            x=1.02,
+
+            if max_anio_mes is not None:
+                df_ultimo_m = df_mes[df_mes["año"] == max_anio_mes]
+                fig_mes.add_trace(
+                    go.Scatter(
+                        x=df_ultimo_m["mes_nom"],
+                        y=df_ultimo_m["casos_totales"],
+                        name=f"{max_anio_mes} (Actual)",
+                        mode="lines+markers+text",
+                        text=df_ultimo_m["casos_totales"],
+                        textposition="top center",
+                        textfont=dict(
+                            size=13,
+                            color="#FF3333",
+                            family="sans-serif",
+                            weight="bold",
                         ),
-                    )
-                    st.plotly_chart(
-                        fig_sem, use_container_width=True, config=config_plotly
-                    )
-
-            with col_mes:
-                st.subheader("📅 Episodios Mensualizados")
-
-                col_m1, col_m2 = st.columns([1.5, 1])
-                with col_m1:
-                    anios_mes_sel = st.multiselect(
-                        "Año(s) - Mensual:",
-                        anios_disponibles,
-                        default=ultimos_dos_anios,
-                        key="g3_anios_multiselect",
-                    )
-                with col_m2:
-                    st.markdown(
-                        "<div style='height: 22px;'></div>",
-                        unsafe_allow_html=True,
-                    )
-                    incluye_anio_actual_m = max_anio_data in anios_mes_sel
-                    label_chk_m = f"Acumulado hasta {max_mes_nombre_real_data} ({max_anio_data})"
-                    corte_acumulado_m = st.checkbox(
-                        label_chk_m,
-                        value=True if incluye_anio_actual_m else False,
-                        disabled=not incluye_anio_actual_m,
-                        key="chk_corte_mes",
-                    )
-
-                df_mes_base = df[df["año"].isin(anios_mes_sel)].copy()
-
-                if incluye_anio_actual_m and corte_acumulado_m:
-                    df_mes_base = df_mes_base[
-                        df_mes_base["mes_num"] <= max_mes_num_real_data
-                    ]
-
-                if not df_mes_base.empty:
-                    df_mes = (
-                        df_mes_base.groupby(["mes_nom", "mes_num", "año"])[
-                            "feb_tot"
-                        ]
-                        .sum()
-                        .reset_index()
-                    )
-
-                    meses_a_mostrar = (
-                        orden_meses[:max_mes_num_real_data]
-                        if (incluye_anio_actual_m and corte_acumulado_m)
-                        else orden_meses
-                    )
-                    df_mes["mes_nom"] = pd.Categorical(
-                        df_mes["mes_nom"],
-                        categories=meses_a_mostrar,
-                        ordered=True,
-                    )
-                    df_mes = df_mes.dropna(subset=["mes_nom"]).sort_values(
-                        "mes_nom"
-                    )
-
-                    anios_seleccionados_ordenados = sorted(df_mes["año"].unique())
-                    max_anio_mes = (
-                        max(anios_seleccionados_ordenados)
-                        if anios_seleccionados_ordenados
-                        else None
-                    )
-
-                    fig_mes = go.Figure()
-                    colores_barras = [
-                        "#636EFA",
-                        "#00CC96",
-                        "#AB63FA",
-                        "#FFA15A",
-                        "#19D3F3",
-                    ]
-
-                    for idx, anio in enumerate(anios_seleccionados_ordenados):
-                        if anio != max_anio_mes:
-                            df_anio_m = df_mes[df_mes["año"] == anio]
-                            fig_mes.add_trace(
-                                go.Bar(
-                                    x=df_anio_m["mes_nom"],
-                                    y=df_anio_m["feb_tot"],
-                                    name=str(anio),
-                                    marker_color=colores_barras[
-                                        idx % len(colores_barras)
-                                    ],
-                                    opacity=0.75,
-                                    text=df_anio_m["feb_tot"],
-                                    textposition="auto",
-                                    textfont=dict(size=12, color="white"),
-                                )
-                            )
-
-                    if max_anio_mes is not None:
-                        df_ultimo_m = df_mes[df_mes["año"] == max_anio_mes]
-                        fig_mes.add_trace(
-                            go.Scatter(
-                                x=df_ultimo_m["mes_nom"],
-                                y=df_ultimo_m["feb_tot"],
-                                name=f"{max_anio_mes} (Actual)",
-                                mode="lines+markers+text",
-                                text=df_ultimo_m["feb_tot"],
-                                textposition="top center",
-                                textfont=dict(
-                                    size=13,
-                                    color="#FF3333",
-                                    family="sans-serif",
-                                    weight="bold",
-                                ),
-                                line=dict(
-                                    shape="spline",
-                                    smoothing=1.3,
-                                    width=4,
-                                    color="#FF3333",
-                                ),
-                                marker=dict(size=8, color="#FF3333"),
-                            )
-                        )
-
-                    if anios_mes_sel:
-                        min_sel = min(anios_mes_sel)
-                        max_sel = max(anios_mes_sel)
-                        rango_str = (
-                            f"DESDE EL AÑO {min_sel} HASTA EL AÑO {max_sel}"
-                            if len(anios_mes_sel) > 1
-                            else f"AÑO {min_sel}"
-                        )
-                    else:
-                        rango_str = "SELECCIONADOS"
-
-                    fig_mes.update_layout(
-                        title=f"COMPARATIVO DE FEBRILES MENSUALIZADOS {rango_str}",
-                        xaxis_title="Mes",
-                        yaxis_title="Casos",
-                        template="plotly_dark",
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        height=340,
-                        margin=dict(l=10, r=10, t=40, b=10),
-                        barmode="group",
-                        legend=dict(
-                            orientation="v",
-                            yanchor="top",
-                            y=1,
-                            xanchor="left",
-                            x=1.02,
+                        line=dict(
+                            shape="spline",
+                            smoothing=1.3,
+                            width=4,
+                            color="#FF3333",
                         ),
+                        marker=dict(size=8, color="#FF3333"),
                     )
-                    st.plotly_chart(
-                        fig_mes, use_container_width=True, config=config_plotly
-                    )
-
-            st.divider()
-
-            # ==========================================
-            # FILA 2: Evolución Anual (Largo) y Comparativo Últimas Semanas (Estrecho)
-            # ==========================================
-            col_hist, col_right = st.columns([1.8, 1])
-
-            with col_hist:
-                st.subheader("📉 Evolución Anual Acumulada")
-
-                anios_hist = st.multiselect(
-                    "Seleccionar Año(s) - Anual:",
-                    anios_disponibles,
-                    default=anios_disponibles,
-                    key="g4_anios",
-                )
-                df_hist_base = df[df["año"].isin(anios_hist)].copy()
-
-                if not df_hist_base.empty:
-                    df_hist = (
-                        df_hist_base.groupby("año")["feb_tot"]
-                        .sum()
-                        .reset_index()
-                        .sort_values("año")
-                    )
-
-                    fig_hist = go.Figure()
-                    fig_hist.add_trace(
-                        go.Scatter(
-                            x=df_hist["año"],
-                            y=df_hist["feb_tot"],
-                            mode="lines+markers+text",
-                            text=df_hist["feb_tot"],
-                            textposition="top center",
-                            textfont=dict(size=12, color="#ffffff"),
-                            line=dict(
-                                shape="spline",
-                                smoothing=1.3,
-                                width=3,
-                                color="#ff7f0e",
-                            ),
-                            marker=dict(size=7, color="#ff7f0e"),
-                            fill="tozeroy",
-                            fillcolor="rgba(255, 127, 14, 0.3)",
-                        )
-                    )
-
-                    fig_hist.update_layout(
-                        title="COMPARATIVO DE FEBRILES (ANUAL)",
-                        xaxis_title="Año",
-                        yaxis_title="feb_tot",
-                        template="plotly_dark",
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        height=340,
-                        margin=dict(l=10, r=10, t=40, b=10),
-                        xaxis=dict(type="category"),
-                    )
-                    st.plotly_chart(
-                        fig_hist, use_container_width=True, config=config_plotly
-                    )
-
-            with col_right:
-                st.subheader("📈 Comparativo Últimas Semanas")
-
-                anios_g2 = st.multiselect(
-                    "Seleccionar Año(s) - Últimas Semanas:",
-                    anios_disponibles,
-                    default=ultimos_dos_anios,
-                    key="g2_anios_independiente",
                 )
 
-                semanas_disponibles_data = sorted(
-                    df_max_anio[df_max_anio["feb_tot"] > 0]["semana"].unique()
+            rango_str = (
+                f"DESDE EL AÑO {min(anios_mes_sel)} HASTA EL AÑO {max(anios_mes_sel)}"
+                if len(anios_mes_sel) > 1
+                else f"AÑO {min(anios_mes_sel)}"
+                if anios_mes_sel
+                else "SELECCIONADOS"
+            )
+
+            fig_mes.update_layout(
+                title=f"COMPARATIVO DE {titulo_evento.upper()} MENSUALIZADOS {rango_str}",
+                xaxis_title="Mes",
+                yaxis_title="Casos",
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=340,
+                margin=dict(l=10, r=10, t=40, b=10),
+                barmode="group",
+                legend=dict(
+                    orientation="v", yanchor="top", y=1, xanchor="left", x=1.02
+                ),
+            )
+            st.plotly_chart(
+                fig_mes, use_container_width=True, config=config_plotly
+            )
+
+    st.divider()
+
+    # ==========================================
+    # FILA 2: Evolución Anual y Comparativo Últimas Semanas
+    # ==========================================
+    col_hist, col_right = st.columns([1.8, 1])
+
+    with col_hist:
+        st.subheader("📉 Evolución Anual Acumulada")
+
+        anios_hist = st.multiselect(
+            "Seleccionar Año(s) - Anual:",
+            anios_disponibles,
+            default=anios_disponibles,
+            key=f"{key_prefix}_g4_anios",
+        )
+        df_hist_base = df[df["año"].isin(anios_hist)].copy()
+
+        if not df_hist_base.empty:
+            df_hist = (
+                df_hist_base.groupby("año")["casos_totales"]
+                .sum()
+                .reset_index()
+                .sort_values("año")
+            )
+
+            fig_hist = go.Figure()
+            fig_hist.add_trace(
+                go.Scatter(
+                    x=df_hist["año"],
+                    y=df_hist["casos_totales"],
+                    mode="lines+markers+text",
+                    text=df_hist["casos_totales"],
+                    textposition="top center",
+                    textfont=dict(size=12, color="#ffffff"),
+                    line=dict(
+                        shape="spline", smoothing=1.3, width=3, color="#ff7f0e"
+                    ),
+                    marker=dict(size=7, color="#ff7f0e"),
+                    fill="tozeroy",
+                    fillcolor="rgba(255, 127, 14, 0.3)",
                 )
-                if len(semanas_disponibles_data) >= 2:
-                    semanas_ultimas = [
-                        semanas_disponibles_data[-2],
-                        semanas_disponibles_data[-1],
-                    ]
-                elif len(semanas_disponibles_data) == 1:
-                    semanas_ultimas = [semanas_disponibles_data[0]]
-                else:
-                    semanas_ultimas = [semana_epidemiologica_actual]
+            )
 
-                df_comp_data = df[
-                    (df["año"].isin(anios_g2))
-                    & (df["semana"].isin(semanas_ultimas))
-                ].copy()
-                df_comp_data["año_str"] = df_comp_data["año"].astype(str)
+            fig_hist.update_layout(
+                title=f"COMPARATIVO DE {titulo_evento.upper()} (ANUAL)",
+                xaxis_title="Año",
+                yaxis_title="Casos Totales",
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=340,
+                margin=dict(l=10, r=10, t=40, b=10),
+                xaxis=dict(type="category"),
+            )
+            st.plotly_chart(
+                fig_hist, use_container_width=True, config=config_plotly
+            )
 
-                if not df_comp_data.empty:
-                    df_comp = (
-                        df_comp_data.groupby(["semana", "año_str"])["feb_tot"]
-                        .sum()
-                        .reset_index()
-                    )
-                    fig_ult = px.bar(
-                        df_comp,
-                        x="semana",
-                        y="feb_tot",
-                        color="año_str",
-                        barmode="group",
-                        text="feb_tot",
-                        template="plotly_dark",
-                        title=f"Semanas {' y '.join(map(str, semanas_ultimas))}",
-                        labels={
-                            "semana": "N° de Semana",
-                            "feb_tot": "Casos",
-                            "año_str": "Año",
-                        },
-                    )
-                    fig_ult.update_traces(
-                        textfont_size=13, textposition="auto"
-                    )
-                    fig_ult.update_xaxes(type="category")
-                    fig_ult.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        height=340,
-                        margin=dict(l=10, r=10, t=40, b=10),
-                    )
-                    st.plotly_chart(
-                        fig_ult, use_container_width=True, config=config_plotly
-                    )
+    with col_right:
+        st.subheader("📈 Comparativo Últimas Semanas")
 
-    except Exception as e:
-        st.error(f"Error al cargar la visualización: {e}")
+        anios_g2 = st.multiselect(
+            "Seleccionar Año(s) - Últimas Semanas:",
+            anios_disponibles,
+            default=ultimos_dos_anios,
+            key=f"{key_prefix}_g2_anios",
+        )
+
+        semanas_disponibles_data = sorted(
+            df_max_anio[df_max_anio["casos_totales"] > 0]["semana"].unique()
+        )
+        if len(semanas_disponibles_data) >= 2:
+            semanas_ultimas = [
+                semanas_disponibles_data[-2],
+                semanas_disponibles_data[-1],
+            ]
+        elif len(semanas_disponibles_data) == 1:
+            semanas_ultimas = [semanas_disponibles_data[0]]
+        else:
+            semanas_ultimas = [semana_epidemiologica_actual]
+
+        df_comp_data = df[
+            (df["año"].isin(anios_g2)) & (df["semana"].isin(semanas_ultimas))
+        ].copy()
+        df_comp_data["año_str"] = df_comp_data["año"].astype(str)
+
+        if not df_comp_data.empty:
+            df_comp = (
+                df_comp_data.groupby(["semana", "año_str"])["casos_totales"]
+                .sum()
+                .reset_index()
+            )
+            fig_ult = px.bar(
+                df_comp,
+                x="semana",
+                y="casos_totales",
+                color="año_str",
+                barmode="group",
+                text="casos_totales",
+                template="plotly_dark",
+                title=f"Semanas {' y '.join(map(str, semanas_ultimas))}",
+                labels={
+                    "semana": "N° de Semana",
+                    "casos_totales": "Casos",
+                    "año_str": "Año",
+                },
+            )
+            fig_ult.update_traces(textfont_size=13, textposition="auto")
+            fig_ult.update_xaxes(type="category")
+            fig_ult.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=340,
+                margin=dict(l=10, r=10, t=40, b=10),
+            )
+            st.plotly_chart(
+                fig_ult, use_container_width=True, config=config_plotly
+            )
+
+
+# NAVEGACIÓN Y CONTROL DE MÓDULOS
+if modulo_seleccionado == "🌡️ Febriles":
+    df = cargar_datos_csv("febriles_consolidado.csv", col_total_casos="feb_tot")
+    if df is None:
+        st.error("⚠️ No se encontró el archivo `febriles_consolidado.csv`.")
+    else:
+        renderizar_dashboard(
+            df, titulo_evento="Febriles", key_prefix="febriles"
+        )
+
+elif modulo_seleccionado == "🫁 IRAS":
+    df = cargar_datos_csv("iras_consolidado.csv", col_total_casos="feb_tot")
+    if df is None:
+        # Intenta cargar alternativas comunes si el nombre varia ligeramente
+        if os.path.exists("iras.csv"):
+            df = cargar_datos_csv("iras.csv")
+
+    if df is None:
+        st.warning(
+            "⚠️ Aún no se detecta el archivo `iras_consolidado.csv` en el repositorio. "
+            "Por favor, asegúrate de subirlo con ese nombre exacto a la raíz del repositorio de GitHub."
+        )
+    else:
+        renderizar_dashboard(df, titulo_evento="IRAS", key_prefix="iras")
 
 else:
     st.title("🚧 Módulo en Desarrollo")
