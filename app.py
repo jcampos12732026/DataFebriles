@@ -34,27 +34,6 @@ st.markdown(
         color: #ffffff;
     }
 
-    .homenaje-banner-sidebar {
-        background: linear-gradient(135deg, rgba(20,30,48,0.95), rgba(36,59,85,0.95));
-        border: 1px solid rgba(255, 215, 0, 0.6);
-        border-radius: 8px;
-        padding: 10px;
-        text-align: center;
-        color: #ffeb3b;
-        font-size: 12px;
-        font-weight: 500;
-        margin-top: 15px;
-        box-shadow: 0 0 15px rgba(255, 215, 0, 0.25), inset 0 0 10px rgba(255, 255, 255, 0.1);
-        text-shadow: 0 0 6px rgba(255, 235, 59, 0.4);
-    }
-    .homenaje-banner-sidebar span {
-        color: #ffffff;
-        font-weight: bold;
-        display: block;
-        margin-top: 3px;
-        text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
-    }
-
     .block-container {
         padding-top: 2.5rem !important;
         padding-bottom: 1rem !important;
@@ -194,26 +173,6 @@ with st.sidebar:
         "Seleccionar Módulo:",
         ["🌡️ Febriles", "🫁 IRAS", "🦟 Dengue (Próximamente)"],
         index=0,
-    )
-
-    st.markdown("---")
-    st.markdown(
-        "<h4 style='color:#ffffff; font-size: 14px; margin-top: 10px; font-weight: bold;'>⚙️ Estado del Sistema</h4>",
-        unsafe_allow_html=True,
-    )
-    st.info("Módulos independientes operativos.")
-
-    # --- BANNER DE HOMENAJE ---
-    st.markdown(
-        """
-        <div class="homenaje-banner-sidebar">
-            ✨ <strong>En Honor y Memoria Acaecidas en Pandemia:</strong> 
-            <span>⭐ Angela Neyra</span>
-            <span>⭐ Violeta Huacho</span>
-            <span>⭐ Celia Silva</span> ✨
-        </div>
-        """,
-        unsafe_allow_html=True,
     )
 
 # --- CABECERA PRINCIPAL ---
@@ -543,7 +502,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
     st.divider()
 
     # ==========================================
-    # FILA 2: Evolución Anual Suavizada con Visualización Optimizada en Extremos
+    # FILA 2: Evolución Anual Suavizada
     # ==========================================
     col_hist, col_right = st.columns([1.8, 1])
 
@@ -562,7 +521,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             anios_totales_ord = sorted(df_totales_anuales["año"].unique())
 
             # Configuración de Posicionamiento de Texto Dinámico para Extremos
-            # El primer punto se orienta 'top right' y el último 'top left' para no salirse de los márgenes
             posiciones_texto = []
             cant_puntos = len(df_totales_anuales)
 
@@ -693,7 +651,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                     zeroline=True,
                     zerolinecolor="rgba(255,255,255,0.2)",
                 ),
-                # AÑADIDO UN PADDING EN X (-0.5 A +0.5) PARA QUE NINGÚN DATO EXTREMO SE CORTE CON EL BORDE
                 xaxis=dict(
                     range=[anio_min_total - 0.5, anio_max_total + 0.5],
                     dtick=1,
