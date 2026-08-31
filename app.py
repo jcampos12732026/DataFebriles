@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Estilos CSS unificados y optimizados para evitar cortes arriba
+# Estilos CSS unificados
 st.markdown(
     """
     <style>
@@ -109,7 +109,8 @@ def cargar_datos():
   }
 
   if "mes" in df.columns:
-    df["mes_nom"] = df["mes"].map(meses_nombre).fillna("Desconocido")
+    df["mes_num"] = df["mes"].astype(int)
+    df["mes_nom"] = df["mes_num"].map(meses_nombre).fillna("Desconocido")
   elif "fecha" in df.columns:
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
     df["mes_num"] = df["fecha"].dt.month
@@ -129,23 +130,19 @@ try:
   max_anio_data = int(df["año"].max())
   df_max_anio = df[df["año"] == max_anio_data]
 
+  # Determinar última semana y último mes registrados
   max_semana_real_data = (
       int(df_max_anio[df_max_anio["feb_tot"] > 0]["semana"].max())
       if not df_max_anio.empty
       else 1
   )
 
-  hoy = datetime.now()
-  semana_pc_actual = int(hoy.strftime("%V"))
-  if hoy.year == 2026:
-    semana_pc_actual = 34
-
-  anios_disponibles = sorted(df["año"].unique())
-  ultimos_dos_anios = (
-      anios_disponibles[-2:]
-      if len(anios_disponibles) >= 2
-      else anios_disponibles
+  max_mes_num_real_data = (
+      int(df_max_anio[df_max_anio["feb_tot"] > 0]["mes_num"].max())
+      if not df_max_anio.empty
+      else 1
   )
+
   orden_meses = [
       "Enero",
       "Febrero",
@@ -160,6 +157,19 @@ try:
       "Noviembre",
       "Diciembre",
   ]
+  max_mes_nombre_real_data = orden_meses[max_mes_num_real_data - 1]
+
+  hoy = datetime.now()
+  semana_pc_actual = int(hoy.strftime("%V"))
+  if hoy.year == 2026:
+    semana_pc_actual = 34
+
+  anios_disponibles = sorted(df["año"].unique())
+  ultimos_dos_anios = (
+      anios_disponibles[-2:]
+      if len(anios_disponibles) >= 2
+      else anios_disponibles
+  )
 
   # --- BARRA LATERAL ---
   with st.sidebar:
@@ -226,17 +236,19 @@ try:
       st.markdown(
           "<div style='height: 22px;'></div>", unsafe_allow_html=True
       )
-      incluye_anio_actual = max_anio_data in anios_g1
-      label_chk = f"Acumulado hasta SE {max_semana_real_data} ({max_anio_data})"
-      corte_acumulado = st.checkbox(
-          label_chk,
-          value=True if incluye_anio_actual else False,
-          disabled=not incluye_anio_actual,
+      incluye_anio_actual_g1 = max_anio_data in anios_g1
+      label_chk_g1 = (
+          f"Acumulado hasta SE {max_semana_real_data} ({max_anio_data})"
+      )
+      corte_acumulado_g1 = st.checkbox(
+          label_chk_g1,
+          value=True if incluye_anio_actual_g1 else False,
+          disabled=not incluye_anio_actual_g1,
           key="chk_corte_g1",
       )
 
     df_g1 = df[df["año"].isin(anios_g1)].copy()
-    if incluye_anio_actual and corte_acumulado:
+    if incluye_anio_actual_g1 and corte_acumulado_g1:
       df_g1 = df_g1[df_g1["semana"] <= max_semana_real_data]
 
     if not df_g1.empty:
@@ -292,13 +304,16 @@ try:
             )
         )
 
-      texto_corte_titulo = (
+      texto_corte_titulo_g1 = (
           f" (HASTA SE {max_semana_real_data})"
-          if (incluye_anio_actual and corte_acumulado)
+          if (incluye_anio_actual_g1 and corte_acumulado_g1)
           else " (AÑOS COMPLETOS)"
       )
       fig_sem.update_layout(
-          title=f"TOTAL DE EPISODIOS SEMANALES DE FEBRILES{texto_corte_titulo}",
+          title=(
+              "TOTAL DE EPISODIOS SEMANALES DE"
+              f" FEBRILES{texto_corte_titulo_g1}"
+          ),
           xaxis_title="N° de Semana",
           yaxis_title="Casos",
           template="plotly_dark",
@@ -319,22 +334,52 @@ try:
   with col_mes:
     st.subheader("📅 Episodios Mensualizados")
 
-    anios_mes_sel = st.multiselect(
-        "Año(s) - Mensual:",
-        anios_disponibles,
-        default=ultimos_dos_anios,
-        key="g3_anios_multiselect",
-    )
+    col_m1, col_m2 = st.columns([1.5, 1])
+    with col_m1:
+      anios_mes_sel = st.multiselect(
+          "Año(s) - Mensual:",
+          anios_disponibles,
+          default=ultimos_dos_anios,
+          key="g3_anios_multiselect",
+      )
+    with col_m2:
+      st.markdown(
+          "<div style='height: 22px;'></div>", unsafe_allow_html=True
+      )
+      incluye_anio_actual_m = max_anio_data in anios_mes_sel
+      label_chk_m = (
+          f"Acumulado hasta {max_mes_nombre_real_data} ({max_anio_data})"
+      )
+      corte_acumulado_m = st.checkbox(
+          label_chk_m,
+          value=True if incluye_anio_actual_m else False,
+          disabled=not incluye_anio_actual_m,
+          key="chk_corte_mes",
+      )
+
     df_mes_base = df[df["año"].isin(anios_mes_sel)].copy()
+
+    # Filtro opcional por corte de mes
+    if incluye_anio_actual_m and corte_acumulado_m:
+      df_mes_base = df_mes_base[df_mes_base["mes_num"] <= max_mes_num_real_data]
 
     if not df_mes_base.empty:
       df_mes = (
-          df_mes_base.groupby(["mes_nom", "año"])["feb_tot"].sum().reset_index()
+          df_mes_base.groupby(["mes_nom", "mes_num", "año"])["feb_tot"]
+          .sum()
+          .reset_index()
+      )
+
+      # Ajuste de meses a mostrar según el filtro de corte
+      meses_a_mostrar = (
+          orden_meses[:max_mes_num_real_data]
+          if (incluye_anio_actual_m and corte_acumulado_m)
+          else orden_meses
       )
       df_mes["mes_nom"] = pd.Categorical(
-          df_mes["mes_nom"], categories=orden_meses, ordered=True
+          df_mes["mes_nom"], categories=meses_a_mostrar, ordered=True
       )
-      df_mes = df_mes.sort_values("mes_nom")
+      df_mes = df_mes.dropna(subset=["mes_nom"]).sort_values("mes_nom")
 
       anios_seleccionados_ordenados = sorted(df_mes["año"].unique())
       max_anio_mes = (
