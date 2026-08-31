@@ -195,14 +195,18 @@ def renderizar_grafico_grupos_etarios(df, key_prefix):
     st.subheader("👶 Distribución por Grupos Etarios (< 5 Años)")
 
     anios_disponibles = sorted(df["año"].unique())
-    max_anio_data = int(df["año"].max())
+    ultimos_dos_anios = (
+        anios_disponibles[-2:]
+        if len(anios_disponibles) >= 2
+        else anios_disponibles
+    )
 
     col_et1, col_et2 = st.columns([1.5, 1])
     with col_et1:
         anios_etarios = st.multiselect(
             "Seleccionar Año(s) - Grupos Etarios:",
             anios_disponibles,
-            default=[max_anio_data],
+            default=ultimos_dos_anios,
             key=f"{key_prefix}_etarios_anios",
         )
 
@@ -356,12 +360,9 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 max(anios_en_datos) if anios_en_datos else max_anio_data
             )
 
-            # Ordenar las semanas numéricamente para evitar cruces en la línea
             df_sem = df_sem.sort_values(by="semana")
-
             colores_barras_inst = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
 
-            # Años anteriores en Barras Institucionales
             for idx, anio in enumerate(anios_en_datos):
                 if anio != max_anio_presente:
                     df_anio = df_sem[df_sem["año"] == anio]
@@ -380,7 +381,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                         )
                     )
 
-            # Último Año (Actual) en Línea Suavizada
             if max_anio_presente in anios_en_datos:
                 df_ultimo = df_sem[df_sem["año"] == max_anio_presente]
                 fig_sem.add_trace(
