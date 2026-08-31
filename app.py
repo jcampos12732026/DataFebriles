@@ -25,7 +25,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Estilos CSS unificados
+# Estilos CSS
 st.markdown(
     """
     <style>
@@ -111,6 +111,12 @@ def cargar_datos_csv(nombre_archivo, col_total_casos="feb_tot"):
     if "ano" in df.columns:
         df = df.rename(columns={"ano": "año"})
 
+    # Mapeo y limpieza de columnas de grupos etarios de IRAS si existen
+    cols_etarios = ["ira_m2", "ira_2_11", "ira_1_4a"]
+    for col in cols_etarios:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
     if col_total_casos not in df.columns:
         posibles_cols = [
             c
@@ -141,9 +147,14 @@ def cargar_datos_csv(nombre_archivo, col_total_casos="feb_tot"):
         )
         df["mes_nom"] = df["mes_num"].map(meses_nombre)
 
-    df["casos_totales"] = (
-        df[col_total_casos] if col_total_casos in df.columns else 0
-    )
+    # Si existen columnas individuales de IRA, se calcula el total dinámico
+    if all(c in df.columns for c in cols_etarios):
+        df["casos_totales"] = df["ira_m2"] + df["ira_2_11"] + df["ira_1_4a"]
+    else:
+        df["casos_totales"] = (
+            df[col_total_casos] if col_total_casos in df.columns else 0
+        )
+
     return df
 
 
@@ -183,6 +194,69 @@ else:
         '<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px; margin-bottom: 10px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>',
         unsafe_allow_html=True,
     )
+
+
+# RENDERIZADOR DE GRÁFICO POR GRUPOS ETARIOS (EXCLUSIVO IRAS)
+def renderizar_grafico_grupos_etarios(df, titulo_evento):
+    cols_grupos = {
+        "ira_m2": "Menores de 2 meses",
+        "ira_2_11": "2-11 Meses",
+        "ira_1_4a": "1-4 Años",
+    }
+    cols_presentes = [c for c in cols_grupos.keys() if c in df.columns]
+
+    if not cols_presentes:
+        return
+
+    st.subheader(f"👶 Total de casos de {titulo_evento} por grupo etario")
+
+    df_etario = df.melt(
+        id_vars=["año"],
+        value_vars=cols_presentes,
+        var_name="grupo_raw",
+        value_name="casos",
+    )
+    df_etario["Grupo Etario"] = df_etario["grupo_raw"].map(cols_grupos)
+
+    df_resumen = (
+        df_etario.groupby(["Grupo Etario", "año"])["casos"].sum().reset_index()
+    )
+    df_resumen = df_resumen[df_resumen["casos"] > 0]
+    df_resumen["año_str"] = df_resumen["año"].astype(str)
+
+    fig = px.bar(
+        df_resumen,
+        x="Grupo Etario",
+        y="casos",
+        color="año_str",
+        barmode="group",
+        text="casos",
+        category_orders={
+            "Grupo Etario": ["Menores de 2 meses", "2-11 Meses", "1-4 Años"]
+        },
+        color_discrete_sequence=["#4169E1", "#FF7F0E", "#2CA02C"],
+        labels={"casos": "Casos", "año_str": "Año"},
+    )
+
+    fig.update_traces(
+        textposition="outside",
+        textfont=dict(size=14, color="white", weight="bold"),
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=380,
+        margin=dict(l=10, r=10, t=30, b=10),
+        xaxis_title="",
+        yaxis_title="Total de Casos",
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+        ),
+    )
+
+    st.plotly_chart(fig, use_container_width=True, config=config_plotly)
 
 
 # FUNCIÓN RENDERIZADORA REUTILIZABLE PARA DASHBOARDS
@@ -240,6 +314,11 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
         if len(anios_disponibles) >= 2
         else anios_disponibles
     )
+
+    # Si existen columnas de grupos etarios, renderizar la sección especial arriba
+    if any(c in df.columns for c in ["ira_m2", "ira_2_11", "ira_1_4a"]):
+        renderizar_grafico_grupos_etarios(df, titulo_evento)
+        st.divider()
 
     # ==========================================
     # FILA 1: Episodios Semanales y Mensualizados
@@ -520,7 +599,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             anio_max_total = int(df_totales_anuales["año"].max())
             anios_totales_ord = sorted(df_totales_anuales["año"].unique())
 
-            # Configuración de Posicionamiento de Texto Dinámico para Extremos
             posiciones_texto = []
             cant_puntos = len(df_totales_anuales)
 
@@ -532,7 +610,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 else:
                     posiciones_texto.append("top center")
 
-            # Promedios
             promedio_total = df_totales_anuales["casos_totales"].mean()
 
             ultimos_10 = anios_totales_ord[-10:]
@@ -549,7 +626,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
 
             fig_hist = go.Figure()
 
-            # 1. Casos Anuales (Curva Suavizada Spline + Relleno Profesional + Texto Optimizado)
             fig_hist.add_trace(
                 go.Scatter(
                     x=df_totales_anuales["año"],
@@ -575,7 +651,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # 2. Promedio Histórico Total (Cyan Neón)
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
@@ -586,7 +661,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # 3. Promedio Últimos 10 Años (Amarillo Neón)
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
@@ -597,7 +671,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # 4. Promedio Últimos 5 Años (Verde Neón)
             fig_hist.add_trace(
                 go.Scatter(
                     x=[anio_min_total, anio_max_total],
@@ -608,7 +681,6 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
                 )
             )
 
-            # 5. Líneas Verticales Indicadoras de Grupos
             fig_hist.add_vline(
                 x=anio_inicio_10,
                 line_width=2,
@@ -727,7 +799,7 @@ def renderizar_dashboard(df, titulo_evento, key_prefix):
             )
 
 
-# NAVEGACIÓN Y CONTROL DE MÓDULOS
+# CONTROL DE NAVEGACIÓN ENTRE MÓDULOS
 if modulo_seleccionado == "🌡️ Febriles":
     df = cargar_datos_csv("febriles_consolidado.csv", col_total_casos="feb_tot")
     if df is None:
@@ -745,8 +817,7 @@ elif modulo_seleccionado == "🫁 IRAS":
 
     if df is None:
         st.warning(
-            "⚠️ Aún no se detecta el archivo `iras_consolidado.csv` en el repositorio. "
-            "Asegúrate de subirlo con ese nombre exacto a la raíz de tu repositorio de GitHub."
+            "⚠️ No se detectó el archivo `iras_consolidado.csv` o `iras.csv` en la raíz del repositorio."
         )
     else:
         renderizar_dashboard(df, titulo_evento="IRAS", key_prefix="iras")
