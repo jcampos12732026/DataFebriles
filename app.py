@@ -1,7 +1,5 @@
 import os
-import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 import streamlit as st
 
 # Configuración de página
@@ -27,7 +25,6 @@ def cargar_datos(evento):
             return None
         df = pd.read_csv(ruta, low_memory=False)
 
-        # Rellenar valores nulos en grupos clave
         cols_ped = ["IRA_M2", "IRA_2_11", "IRA_1_4A"]
         for col in cols_ped:
             if col in df.columns:
@@ -35,14 +32,13 @@ def cargar_datos(evento):
             else:
                 df[col] = 0
 
-        # Suma total pediátrica (<2M + 2-11M + 1-4A)
         df["TOTAL_CASOS"] = df["IRA_M2"] + df["IRA_2_11"] + df["IRA_1_4A"]
         return df
 
     return None
 
 
-# Barra Lateral - Selector Maestro
+# Barra Lateral
 st.sidebar.title("📊 Control Epidemiológico")
 evento_seleccionado = st.sidebar.radio(
     "Seleccione Evento:", ["Febriles", "IRAS"]
@@ -54,13 +50,13 @@ df = cargar_datos(evento_seleccionado)
 if df is None:
     st.error(
         f"⚠️ No se encontró el archivo consolidado para **{evento_seleccionado}**. "
-        f"Asegúrate de ejecutar primero el script `Consolidar.py` en la carpeta."
+        f"Asegúrate de ejecutar primero el script `Consolidar.py`."
     )
 else:
     st.title(f"📈 Sala Situacional - {evento_seleccionado}")
     st.markdown("---")
 
-    # Filtros de Años
+    # Métrica de Años
     anios_disponibles = sorted(df["ANO"].dropna().unique().astype(int))
     anio_actual = max(anios_disponibles)
     anio_anterior = anio_actual - 1
@@ -81,7 +77,7 @@ else:
             ),
         )
 
-    # 1. Gráfico de Curva Semanal Comparativa (Año Actual vs Año Anterior)
+    # 1. Gráfico de Curva Semanal Comparativa (Gráfico nativo)
     st.subheader(
         f"Comparativo Semanal: {anio_anterior} vs {anio_actual}"
     )
@@ -90,25 +86,12 @@ else:
         df[df["ANO"].isin([anio_anterior, anio_actual])]
         .groupby(["SEMANA", "ANO"])["TOTAL_CASOS"]
         .sum()
-        .reset_index()
+        .unstack()
     )
 
-    fig, ax = plt.subplots(figsize=(10, 4))
-    sns.lineplot(
-        data=df_comp,
-        x="SEMANA",
-        y="TOTAL_CASOS",
-        hue="ANO",
-        marker="o",
-        palette="tab10",
-        ax=ax,
-    )
-    ax.set_ylabel("Episodios")
-    ax.set_xlabel("Semana Epidemiológica")
-    ax.grid(True, linestyle="--", alpha=0.5)
-    st.pyplot(fig)
+    st.line_chart(df_comp)
 
-    # 2. Desglose por Grupos Etarios (Exclusivo IRAS)
+    # 2. Desglose por Grupos Etarios (Exclusivo IRAS - Gráfico nativo)
     if evento_seleccionado == "IRAS":
         st.subheader(f"Desglose por Grupo Etario Pediátrico ({anio_actual})")
 
@@ -118,29 +101,8 @@ else:
         a4 = df_act["IRA_1_4A"].sum()
 
         datos_etarios = pd.DataFrame(
-            {
-                "Grupo Etario": [
-                    "< de 2 Meses",
-                    "2 a 11 Meses",
-                    "1 a 4 Años",
-                ],
-                "Casos": [m2, m11, a4],
-            }
+            {"Casos": [m2, m11, a4]},
+            index=["< de 2 Meses", "2 a 11 Meses", "1 a 4 Años"],
         )
 
-        fig2, ax2 = plt.subplots(figsize=(8, 3.5))
-        sns.barplot(
-            data=datos_etarios,
-            x="Grupo Etario",
-            y="Casos",
-            palette="Blues_d",
-            ax=ax2,
-        )
-        for p in ax2.patches:
-            ax2.annotate(
-                f"{int(p.get_height())}",
-                (p.get_x() + p.get_width() / 2.0, p.get_height()),
-                ha="center",
-                va="bottom",
-            )
-        st.pyplot(fig2)
+        st.bar_chart(datos_etarios)
