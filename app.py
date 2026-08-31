@@ -1,325 +1,918 @@
-import streamlit as st
+import os
+from datetime import datetime, timedelta
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import streamlit as st
 
-# Configuración inicial de la página
+# 1. Configuración de página
 st.set_page_config(
-    page_title="Sala Situacional - Análisis Epidemiológico",
-    page_icon="📊",
+    page_title="Sala Situacional Epidemiológica - C.S. César López Silva",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# Configuración común para los gráficos de Plotly
-config_plotly = {
-    "displayModeBar": True,
-    "displaylogo": False,
-    "modeBarButtonsToRemove": ["lasso2d", "select2d"],
+# 2. Estilos CSS con Identidad Institucional MINSA
+st.markdown(
+    """
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    div[data-testid="stStatusWidget"] {visibility: hidden;}
+
+    .stApp {
+        background: radial-gradient(ellipse at bottom, #0d1b2a 0%, #080d1a 100%);
+        color: #ffffff;
+    }
+
+    .block-container {
+        padding-top: 2.5rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        max-width: 100% !important;
+    }
+
+    [data-testid="stSidebar"] {
+        width: 290px !important;
+        min-width: 290px !important;
+        background-color: #060a12 !important;
+    }
+
+    .unified-card-header {
+        background: linear-gradient(145deg, #002244, #003366);
+        border: 2px solid #0056b3;
+        border-radius: 10px;
+        padding: 14px 10px;
+        text-align: center;
+        box-shadow: 0px 4px 12px rgba(0, 86, 179, 0.4);
+        margin-bottom: 15px;
+        margin-top: 10px;
+    }
+
+    span[data-baseweb="tag"] {
+        background-color: #d90429 !important;
+        border-radius: 4px !important;
+        padding: 1px 5px !important;
+        font-size: 11px !important;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
+
+# 3. Función para calcular la Semana Epidemiológica
+def obtener_semana_epidemiologica(fecha):
+    primer_dia = datetime(fecha.year, 1, 1)
+    dias_hasta_domingo = (6 - primer_dia.weekday()) % 7
+    primer_domingo = primer_dia + timedelta(days=dias_hasta_domingo)
+
+    if fecha < primer_domingo:
+        return obtener_semana_epidemiologica(datetime(fecha.year - 1, 12, 31))
+
+    dias_transcurridos = (fecha - primer_domingo).days
+    semana = (dias_transcurridos // 7) + 1
+    return semana
+
+
+meses_nombre = {
+    1: "Enero",
+    2: "Febrero",
+    3: "Marzo",
+    4: "Abril",
+    5: "Mayo",
+    6: "Junio",
+    7: "Julio",
+    8: "Agosto",
+    9: "Setiembre",
+    10: "Octubre",
+    11: "Noviembre",
+    12: "Diciembre",
 }
 
-# ==========================================
-# CARGA DE DATOS DINÁMICA DESDE LOS CONSOLIDADOS
-# ==========================================
-@st.cache_data
-def cargar_datos_evento(evento_sel):
-    key = evento_sel.lower().replace(" ", "_")
-    
-    # Asignar el nombre del archivo consolidado según el evento
-    if key == "edas":
-        archivo = "consolidado_edas_total.csv"
-    elif key == "iras":
-        archivo = "consolidado_iras_total.csv"
+
+# 4. Carga y procesamiento de datos
+def cargar_datos_csv(nombre_archivo, col_total_casos=None):
+    if not os.path.exists(nombre_archivo):
+        return None
+    df = pd.read_csv(nombre_archivo)
+    df.columns = df.columns.str.strip().str.lower()
+
+    if "ano" in df.columns:
+        df = df.rename(columns={"ano": "año"})
+
+    cols_iras = ["ira_m2", "ira_2_11", "ira_1_4a"]
+    tiene_cols_iras = all(col in df.columns for col in cols_iras)
+
+    if tiene_cols_iras:
+        for col in cols_iras:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+        df["casos_totales"] = df["ira_m2"] + df["ira_2_11"] + df["ira_1_4a"]
     else:
-        archivo = f"consolidado_{key}_total.csv"
-        
-    try:
-        # Intenta leer el archivo CSV real de la carpeta / repositorio
-        df = pd.read_csv(archivo, sep=None, engine='python', encoding='utf-8')
-        return df
-    except Exception as e:
-        # Fallback de seguridad por si el archivo aún no está subido
-        st.warning(f"⚠️ No se encontró el archivo '{archivo}'. Usando datos de ejemplo temporales.")
-        
-        if key == "edas":
-            data_fallback = {
-                "año": [2024, 2025, 2024, 2025],
-                "semana": [1, 1, 2, 2],
-                "mes": ["Enero", "Enero", "Febrero", "Febrero"],
-                "evento": [evento_sel, evento_sel, evento_sel, evento_sel],
-                "DAA_C1": [2, 5, 3, 4],
-                "DAA_C1_4": [10, 15, 12, 18],
-                "DAA_C5_11": [20, 25, 22, 30],
-                "DAA_C12_17": [5, 8, 6, 9],
-                "DAA_C18_29": [8, 12, 10, 14],
-                "DAA_C30_59": [12, 18, 15, 20],
-                "DAA_C60": [4, 7, 5, 8],
-                "casos_totales": [61, 90, 73, 103]
-            }
+        if col_total_casos and col_total_casos in df.columns:
+            target_col = col_total_casos
         else:
-            data_fallback = {
-                "año": [2024, 2025, 2024, 2025],
-                "semana": [1, 1, 2, 2],
-                "mes": ["Enero", "Enero", "Febrero", "Febrero"],
-                "evento": [evento_sel, evento_sel, evento_sel, evento_sel],
-                "grupo_edad": ["0-11m", "1-4 años", "0-11m", "5-9 años"],
-                "casos_totales": [10, 15, 20, 25]
-            }
-        return pd.DataFrame(data_fallback)
+            posibles_cols = [
+                c
+                for c in df.columns
+                if "tot" in c or "feb" in c or "casos" in c or "num" in c
+            ]
+            target_col = posibles_cols[0] if posibles_cols else df.columns[-1]
 
-# ==========================================
-# BARRA LATERAL / NAVEGACIÓN
-# ==========================================
-st.sidebar.title("🎛️ Panel de Control")
-st.sidebar.markdown("---")
-
-# Selector de Módulo / Evento Epidemiológico
-evento_seleccionado = st.sidebar.selectbox(
-    "Seleccione el Evento:",
-    options=["IRAS", "EDAS", "Dengue", "Otras Eventos"],
-    index=0
-)
-
-# Mapeo de prefijos y títulos
-key_prefix = evento_seleccionado.lower().replace(" ", "_")
-titulo_evento = evento_seleccionado
-
-st.sidebar.markdown("---")
-st.sidebar.info("ℹ️ Utilice los filtros adicionales en cada sección según sea necesario.")
-
-# Cargar el DataFrame correspondiente al evento seleccionado
-df = cargar_datos_evento(evento_seleccionado)
-
-# ==========================================
-# CUERPO PRINCIPAL - SALA SITUACIONAL
-# ==========================================
-st.title(f"📈 Sala Situacional - {titulo_evento}")
-st.markdown("Monitoreo epidemiológico, tendencias y distribución por grupos etarios.")
-
-# Obtener años disponibles
-anios_disponibles = sorted(df["año"].unique()) if "año" in df.columns else [2024, 2025]
-ultimos_dos_anios = anios_disponibles[-2:] if len(anios_disponibles) >= 2 else anios_disponibles
-
-# Layout de dos columnas principales para los gráficos
-col_left, col_right = st.columns(2)
-
-with col_left:
-    st.subheader("📊 Tendencia Semanal")
-    # --- GRÁFICO 1: Comportamiento semanal ---
-    if not df.empty and "semana" in df.columns and "casos_totales" in df.columns:
-        df_semanal = df.groupby(["año", "semana"])["casos_totales"].sum().reset_index()
-        df_semanal["semana_str"] = "SE " + df_semanal["semana"].astype(str) + " (" + df_semanal["año"].astype(str) + ")"
-        
-        fig_semanal = px.line(
-            df_semanal,
-            x="semana",
-            y="casos_totales",
-            color="año",
-            markers=True,
-            template="plotly_dark",
-            title=f"COMPORTAMIENTO SEMANAL DE {titulo_evento.upper()}",
-            labels={"semana": "Semana Epidemiológica", "casos_totales": "Casos Totales", "año": "Año"}
+        df[target_col] = pd.to_numeric(df[target_col], errors="coerce").fillna(
+            0
         )
-        fig_semanal.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            height=380,
-            margin=dict(l=10, r=10, t=50, b=10)
-        )
-        st.plotly_chart(fig_semanal, use_container_width=True, config=config_plotly)
+        df["casos_totales"] = df[target_col]
+
+    cols_a_convertir = ["semana", "año", "mes"]
+    for col in cols_a_convertir:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    df["año"] = df["año"].astype(int)
+    df["semana"] = df["semana"].astype(int)
+
+    if "mes" in df.columns:
+        df["mes_num"] = df["mes"].astype(int)
+        df["mes_nom"] = df["mes_num"].map(meses_nombre).fillna("Desconocido")
+    elif "fecha" in df.columns:
+        df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+        df["mes_num"] = df["fecha"].dt.month
+        df["mes_nom"] = df["mes_num"].map(meses_nombre).fillna("Desconocido")
     else:
-        st.warning("No hay datos suficientes para el gráfico semanal.")
+        df["mes_num"] = (
+            ((df["semana"] - 1) // 4.33 + 1).astype(int).clip(1, 12)
+        )
+        df["mes_nom"] = df["mes_num"].map(meses_nombre)
 
-    st.markdown("---")
-    
-    st.subheader("📅 Distribución Mensual")
-    # --- GRÁFICO 2: Mensualizado ---
-    if not df.empty and "mes" in df.columns:
-        df_mensual = df.groupby(["año", "mes"])["casos_totales"].sum().reset_index()
-        fig_mensual = px.bar(
-            df_mensual,
-            x="mes",
-            y="casos_totales",
-            color="año",
-            barmode="group",
-            template="plotly_dark",
-            title=f"CASOS MENSUALES DE {titulo_evento.upper()}",
-            labels={"mes": "Mes", "casos_totales": "Casos Totales", "año": "Año"}
-        )
-        fig_mensual.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            height=380,
-            margin=dict(l=10, r=10, t=50, b=10)
-        )
-        st.plotly_chart(fig_mensual, use_container_width=True, config=config_plotly)
+    return df
+
+
+config_plotly = {"displayModeBar": "hover"}
+hoy = datetime.now()
+semana_epidemiologica_actual = obtener_semana_epidemiologica(hoy)
+
+
+# --- BARRA LATERAL UNIFICADA ---
+with st.sidebar:
+    st.markdown(
+        "<h4 style='color:#ffffff; font-size: 14px; font-weight: bold; margin-bottom: 5px;'>📡 Evento Epidemiológico</h4>",
+        unsafe_allow_html=True,
+    )
+
+    # Único selector de módulo
+    modulo_seleccionado = st.radio(
+        "Seleccionar Módulo:",
+        ["🌡️ Febriles", "🫁 IRAS", "🦟 Dengue (Próximamente)"],
+        index=0,
+        key="radio_modulo_unico",
+        label_visibility="collapsed",
+    )
+
+# Carga de datos previa para calcular brecha según el módulo seleccionado
+if "Febriles" in modulo_seleccionado:
+    df_actual_temp = cargar_datos_csv(
+        "febriles_consolidado.csv", col_total_casos="feb_tot"
+    )
+    titulo_evento_temp = "Febriles"
+elif "IRAS" in modulo_seleccionado:
+    df_actual_temp = cargar_datos_csv("iras_consolidado.csv")
+    if df_actual_temp is None and os.path.exists("iras.csv"):
+        df_actual_temp = cargar_datos_csv("iras.csv")
+    titulo_evento_temp = "IRAS"
+else:
+    df_actual_temp = None
+    titulo_evento_temp = "Dengue"
+
+# Cálculo de la brecha
+if (
+    df_actual_temp is not None
+    and not df_actual_temp.empty
+    and "año" in df_actual_temp.columns
+):
+    max_anio_data_t = int(df_actual_temp["año"].max())
+    df_max_anio_t = df_actual_temp[df_actual_temp["año"] == max_anio_data_t]
+    df_con_casos_t = df_max_anio_t[df_max_anio_t["casos_totales"] > 0]
+    if not df_con_casos_t.empty and pd.notna(df_con_casos_t["semana"].max()):
+        max_semana_real_t = int(df_con_casos_t["semana"].max())
     else:
-        st.warning("No hay datos suficientes para el gráfico mensual.")
+        max_semana_v = (
+            df_max_anio_t["semana"].max() if not df_max_anio_t.empty else 1
+        )
+        max_semana_real_t = int(max_semana_v) if pd.notna(max_semana_v) else 1
+    brecha_semanas_t = semana_epidemiologica_actual - max_semana_real_t
+else:
+    max_anio_data_t = hoy.year
+    max_semana_real_t = semana_epidemiologica_actual
+    brecha_semanas_t = 0
 
 
-with col_right:
-    st.subheader("📉 Evolución Anual Acumulada")
-    # --- GRÁFICO 3: Evolución Anual ---
-    if not df.empty and "año" in df.columns:
-        df_anual = df.groupby("año")["casos_totales"].sum().reset_index()
-        df_anual["año_str"] = df_anual["año"].astype(str)
-        
-        fig_anual = px.bar(
-            df_anual,
-            x="año_str",
-            y="casos_totales",
-            text="casos_totales",
-            template="plotly_dark",
-            title=f"ACUMULADO ANUAL DE {titulo_evento.upper()}",
-            labels={"año_str": "Año", "casos_totales": "Total Casos"}
+# Renderizado de Tarjetas Informativas en la Barra Lateral
+with st.sidebar:
+    st.markdown(
+        f"""
+        <div class="unified-card-header">
+            <h4 style="margin:0; color:#00CCFF; font-size: 13px; font-weight: bold; text-transform: uppercase;">Semana Actual</h4>
+            <h1 style="font-size: 52px; margin: 0px; color: #ffcc00; font-weight: 900; line-height: 1;">SE {semana_epidemiologica_actual}</h1>
+            <p style="margin:4px 0 0 0; color:#ffffff; font-size: 16px; font-weight: 700;">Año: {hoy.year}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if brecha_semanas_t > 0:
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, rgba(61, 12, 17, 0.95), rgba(92, 29, 36, 0.95)); border-left: 5px solid #D90429; border-radius: 6px; padding: 12px 14px; margin-bottom: 15px; box-shadow: 0px 4px 15px rgba(217, 4, 4, 0.25);">
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 14px; margin-right: 6px;">⚠️</span>
+                    <h4 style="margin: 0; color: #ff8093; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Brecha ({titulo_evento_temp})</h4>
+                </div>
+                <p style="margin: 0; color: #f1f1f1; font-size: 11px; line-height: 1.4;">
+                    SE actual: <b>{semana_epidemiologica_actual}</b><br>
+                    Último registro: <b>SE {max_semana_real_t}</b> ({max_anio_data_t})<br>
+                    Desfase: <b style="color: #ff8093;">{brecha_semanas_t} semana(s)</b>
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        fig_anual.update_traces(textposition='auto')
-        fig_anual.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            height=380,
-            margin=dict(l=10, r=10, t=50, b=10)
-        )
-        st.plotly_chart(fig_anual, use_container_width=True, config=config_plotly)
     else:
-        st.warning("No hay datos suficientes para el gráfico anual.")
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, rgba(10, 51, 26, 0.95), rgba(17, 92, 42, 0.95)); border-left: 5px solid #00FF66; border-radius: 6px; padding: 12px 14px; margin-bottom: 15px; box-shadow: 0px 4px 15px rgba(0, 255, 102, 0.2);">
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 14px; margin-right: 6px;">✅</span>
+                    <h4 style="margin: 0; color: #80ffb2; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">Sincronizado ({titulo_evento_temp})</h4>
+                </div>
+                <p style="margin: 0; color: #f1f1f1; font-size: 11px; line-height: 1.4;">
+                    Información al día en <b>SE {max_semana_real_t}</b> del período {max_anio_data_t}.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    st.markdown("---")
 
-    # --- BLOQUE DINÁMICO: MÓDULO IRIS / EDAS / OTROS ---
-    if key_prefix == "iras":
-        st.subheader("👥 Casos por Grupos Etarios (Apilado)")
-        
-        anios_iras_etario = st.multiselect(
-            "Seleccionar Año(s) - Etarios:",
+# --- CABECERA PRINCIPAL ---
+if os.path.exists("logo_minsa.png"):
+    st.image("logo_minsa.png", use_container_width=True)
+else:
+    st.markdown(
+        '<div style="background-color:#003366; color:white; font-weight:bold; padding:10px; text-align:center; border-radius:6px; margin-bottom: 10px;">PERÚ Ministerio de Salud | Diris Lima Este | RIS Chaclacayo | C.S. CÉSAR LÓPEZ SILVA</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def renderizar_grafico_grupos_etarios(df, key_prefix):
+    cols_iras = ["ira_m2", "ira_2_11", "ira_1_4a"]
+    if not all(c in df.columns for c in cols_iras):
+        return
+
+    st.subheader("👶 Distribución por Grupos Etarios (< 5 Años)")
+
+    anios_disponibles = sorted(df["año"].unique())
+    ultimos_dos_anios = (
+        anios_disponibles[-2:]
+        if len(anios_disponibles) >= 2
+        else anios_disponibles
+    )
+
+    col_et1, col_et2 = st.columns([1.5, 1])
+    with col_et1:
+        anios_etarios = st.multiselect(
+            "Seleccionar Año(s) - Grupos Etarios:",
             anios_disponibles,
             default=ultimos_dos_anios,
             key=f"{key_prefix}_etarios_anios",
         )
-        
-        df_etario_base = df[df["año"].isin(anios_iras_etario)].copy()
-        
-        if not df_etario_base.empty and "grupo_edad" in df_etario_base.columns:
-            df_etario = (
-                df_etario_base.groupby(["año", "grupo_edad"])["casos_totales"]
+
+    df_et = df[df["año"].isin(anios_etarios)]
+
+    if not df_et.empty:
+        df_et_sum = (
+            df_et.groupby("año")[["ira_m2", "ira_2_11", "ira_1_4a"]]
+            .sum()
+            .reset_index()
+        )
+        df_et_melted = df_et_sum.melt(
+            id_vars=["año"],
+            value_vars=["ira_m2", "ira_2_11", "ira_1_4a"],
+            var_name="Grupo Etario",
+            value_name="Casos",
+        )
+
+        nombres_grupos = {
+            "ira_m2": "< 2 Meses",
+            "ira_2_11": "2 a 11 Meses",
+            "ira_1_4a": "1 a 4 Años",
+        }
+        df_et_melted["Grupo Etario"] = df_et_melted["Grupo Etario"].map(
+            nombres_grupos
+        )
+        df_et_melted["año_str"] = df_et_melted["año"].astype(str)
+
+        anios_seleccionados_ordenados = sorted(df_et_sum["año"].unique())
+        colores_base = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
+        mapa_colores = {}
+
+        for idx, anio in enumerate(anios_seleccionados_ordenados):
+            if anio == max(anios_seleccionados_ordenados):
+                mapa_colores[str(anio)] = "#D90429"
+            else:
+                mapa_colores[str(anio)] = colores_base[idx % len(colores_base)]
+
+        fig_et = px.bar(
+            df_et_melted,
+            x="Grupo Etario",
+            y="Casos",
+            color="año_str",
+            barmode="group",
+            text="Casos",
+            template="plotly_dark",
+            labels={"año_str": "Año", "Grupo Etario": "Grupo de Edad"},
+            color_discrete_map=mapa_colores,
+        )
+
+        fig_et.update_traces(textposition="auto", textfont_size=13)
+        fig_et.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=340,
+            margin=dict(l=10, r=10, t=30, b=10),
+        )
+
+        st.plotly_chart(
+            fig_et, use_container_width=True, config=config_plotly
+        )
+
+
+# 6. Función Renderizadora Principal
+def renderizar_dashboard(df, titulo_evento, key_prefix):
+    if df.empty or "año" not in df.columns:
+        st.warning(
+            f"⚠️ El conjunto de datos de {titulo_evento} está vacío o no tiene la columna 'año'."
+        )
+        return
+
+    max_anio_data = int(df["año"].max())
+    df_max_anio = df[df["año"] == max_anio_data]
+    df_con_casos = df_max_anio[df_max_anio["casos_totales"] > 0]
+
+    if not df_con_casos.empty and pd.notna(df_con_casos["semana"].max()):
+        max_semana_real_data = int(df_con_casos["semana"].max())
+    else:
+        max_semana_val = (
+            df_max_anio["semana"].max() if not df_max_anio.empty else 1
+        )
+        max_semana_real_data = (
+            int(max_semana_val) if pd.notna(max_semana_val) else 1
+        )
+
+    if not df_con_casos.empty and pd.notna(df_con_casos["mes_num"].max()):
+        max_mes_num_real_data = int(df_con_casos["mes_num"].max())
+    else:
+        max_mes_val = (
+            df_max_anio["mes_num"].max() if not df_max_anio.empty else 1
+        )
+        max_mes_num_real_data = (
+            int(max_mes_val) if pd.notna(max_mes_val) else 1
+        )
+
+    max_mes_num_real_data = max(1, min(12, max_mes_num_real_data))
+
+    orden_meses = [
+        "Enero",
+        "Febrero",
+        "Marzo",
+        "Abril",
+        "Mayo",
+        "Junio",
+        "Julio",
+        "Agosto",
+        "Setiembre",
+        "Octubre",
+        "Noviembre",
+        "Diciembre",
+    ]
+    max_mes_nombre_real_data = orden_meses[max_mes_num_real_data - 1]
+
+    anios_disponibles = sorted(df["año"].unique())
+    ultimos_dos_anios = (
+        anios_disponibles[-2:]
+        if len(anios_disponibles) >= 2
+        else anios_disponibles
+    )
+
+    # FILA 1: Episodios Semanales y Mensualizados
+    col_mid, col_mes = st.columns([1.8, 1])
+
+    with col_mid:
+        st.subheader(f"📊 Episodios Semanales de {titulo_evento}")
+
+        col_f1, col_f2 = st.columns([1.5, 1])
+        with col_f1:
+            anios_g1 = st.multiselect(
+                "Seleccionar Año(s) - Semanal:",
+                anios_disponibles,
+                default=ultimos_dos_anios,
+                key=f"{key_prefix}_g1_anios",
+            )
+        with col_f2:
+            st.markdown(
+                "<div style='height: 22px;'></div>", unsafe_allow_html=True
+            )
+            incluye_anio_actual_g1 = max_anio_data in anios_g1
+            label_chk_g1 = f"Acumulado hasta SE {max_semana_real_data} ({max_anio_data})"
+            corte_acumulado_g1 = st.checkbox(
+                label_chk_g1,
+                value=True if incluye_anio_actual_g1 else False,
+                disabled=not incluye_anio_actual_g1,
+                key=f"{key_prefix}_chk_corte_g1",
+            )
+
+        df_g1 = df[df["año"].isin(anios_g1)].copy()
+
+        if not df_g1.empty:
+            df_sem = (
+                df_g1.groupby(["semana", "año"])["casos_totales"]
                 .sum()
                 .reset_index()
             )
-            df_etario["año_str"] = df_etario["año"].astype(str)
-            
-            fig_etario = px.bar(
-                df_etario,
-                x="año_str",
-                y="casos_totales",
-                color="grupo_edad",
-                barmode="stack",
-                template="plotly_dark",
-                title=f"DISTRIBUCIÓN APILADA DE {titulo_evento.upper()} POR EDAD",
-                labels={
-                    "año_str": "Año",
-                    "casos_totales": "Casos Totales",
-                    "grupo_edad": "Grupo Etario"
-                },
+            fig_sem = go.Figure()
+            anios_en_datos = sorted(df_sem["año"].unique())
+            max_anio_presente = (
+                max(anios_en_datos) if anios_en_datos else max_anio_data
             )
-            fig_etario.update_layout(
+
+            df_sem = df_sem.sort_values(by="semana")
+            colores_barras = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
+
+            if incluye_anio_actual_g1 and corte_acumulado_g1:
+                df_sem = df_sem[df_sem["semana"] <= max_semana_real_data]
+
+            idx_barra = 0
+            for anio in anios_en_datos:
+                if anio != max_anio_presente:
+                    df_anio = df_sem[df_sem["año"] == anio]
+                    fig_sem.add_trace(
+                        go.Bar(
+                            x=df_anio["semana"],
+                            y=df_anio["casos_totales"],
+                            name=str(anio),
+                            marker_color=colores_barras[
+                                idx_barra % len(colores_barras)
+                            ],
+                            opacity=0.75,
+                            text=df_anio["casos_totales"],
+                            textposition="auto",
+                            textfont=dict(size=10, color="white"),
+                        )
+                    )
+                    idx_barra += 1
+
+            if max_anio_presente in anios_en_datos:
+                df_ultimo = df_sem[df_sem["año"] == max_anio_presente]
+
+                fig_sem.add_trace(
+                    go.Scatter(
+                        x=df_ultimo["semana"],
+                        y=df_ultimo["casos_totales"],
+                        name=f"{max_anio_presente} (Actual)",
+                        mode="lines+markers+text",
+                        text=df_ultimo["casos_totales"],
+                        textposition="top center",
+                        textfont=dict(
+                            size=12,
+                            color="#FFFFFF",
+                            family="sans-serif",
+                            weight="bold",
+                        ),
+                        line=dict(
+                            shape="spline",
+                            smoothing=1.3,
+                            width=4,
+                            color="#D90429",
+                        ),
+                        marker=dict(
+                            size=8,
+                            color="#D90429",
+                            line=dict(width=2, color="#FFFFFF"),
+                        ),
+                    )
+                )
+
+            texto_corte_titulo_g1 = (
+                f" (HASTA SE {max_semana_real_data})"
+                if (incluye_anio_actual_g1 and corte_acumulado_g1)
+                else " (AÑOS COMPLETOS)"
+            )
+            fig_sem.update_layout(
+                title=f"TOTAL DE EPISODIOS SEMANALES DE {titulo_evento.upper()}{texto_corte_titulo_g1}",
+                xaxis_title="N° de Semana Epidemiológica",
+                yaxis_title="Casos",
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=360,
+                margin=dict(l=10, r=10, t=40, b=10),
+                barmode="group",
+                xaxis=dict(
+                    type="category",
+                    categoryorder="array",
+                    categoryarray=list(range(1, 54)),
+                    dtick=1,
+                ),
+                legend=dict(
+                    orientation="v", yanchor="top", y=1, xanchor="left", x=1.02
+                ),
+            )
+            st.plotly_chart(
+                fig_sem, use_container_width=True, config=config_plotly
+            )
+
+    with col_mes:
+        st.subheader("📅 Episodios Mensualizados")
+
+        col_m1, col_m2 = st.columns([1.5, 1])
+        with col_m1:
+            anios_mes_sel = st.multiselect(
+                "Año(s) - Mensual:",
+                anios_disponibles,
+                default=ultimos_dos_anios,
+                key=f"{key_prefix}_g3_anios",
+            )
+        with col_m2:
+            st.markdown(
+                "<div style='height: 22px;'></div>", unsafe_allow_html=True
+            )
+            incluye_anio_actual_m = max_anio_data in anios_mes_sel
+            label_chk_m = f"Acumulado hasta {max_mes_nombre_real_data} ({max_anio_data})"
+            corte_acumulado_m = st.checkbox(
+                label_chk_m,
+                value=True if incluye_anio_actual_m else False,
+                disabled=not incluye_anio_actual_m,
+                key=f"{key_prefix}_chk_corte_mes",
+            )
+
+        df_mes_base = df[df["año"].isin(anios_mes_sel)].copy()
+        if incluye_anio_actual_m and corte_acumulado_m:
+            df_mes_base = df_mes_base[
+                df_mes_base["mes_num"] <= max_mes_num_real_data
+            ]
+
+        if not df_mes_base.empty:
+            df_mes = (
+                df_mes_base.groupby(["mes_nom", "mes_num", "año"])[
+                    "casos_totales"
+                ]
+                .sum()
+                .reset_index()
+            )
+            meses_a_mostrar = (
+                orden_meses[:max_mes_num_real_data]
+                if (incluye_anio_actual_m and corte_acumulado_m)
+                else orden_meses
+            )
+            df_mes["mes_nom"] = pd.Categorical(
+                df_mes["mes_nom"], categories=meses_a_mostrar, ordered=True
+            )
+            df_mes = df_mes.dropna(subset=["mes_nom"]).sort_values("mes_nom")
+
+            anios_seleccionados_ordenados = sorted(df_mes["año"].unique())
+            max_anio_mes = (
+                max(anios_seleccionados_ordenados)
+                if anios_seleccionados_ordenados
+                else None
+            )
+
+            fig_mes = go.Figure()
+            colores_barras_inst = ["#0056B3", "#0088CC", "#4A90E2", "#6C757D"]
+
+            for idx, anio in enumerate(anios_seleccionados_ordenados):
+                if anio != max_anio_mes:
+                    df_anio_m = df_mes[df_mes["año"] == anio]
+                    fig_mes.add_trace(
+                        go.Bar(
+                            x=df_anio_m["mes_nom"],
+                            y=df_anio_m["casos_totales"],
+                            name=str(anio),
+                            marker_color=colores_barras_inst[
+                                idx % len(colores_barras_inst)
+                            ],
+                            opacity=0.8,
+                            text=df_anio_m["casos_totales"],
+                            textposition="auto",
+                            textfont=dict(size=12, color="white"),
+                        )
+                    )
+
+            if max_anio_mes is not None:
+                df_ultimo_m = df_mes[df_mes["año"] == max_anio_mes]
+                fig_mes.add_trace(
+                    go.Scatter(
+                        x=df_ultimo_m["mes_nom"],
+                        y=df_ultimo_m["casos_totales"],
+                        name=f"{max_anio_mes} (Actual)",
+                        mode="lines+markers+text",
+                        text=df_ultimo_m["casos_totales"],
+                        textposition="top center",
+                        textfont=dict(
+                            size=13,
+                            color="#D90429",
+                            family="sans-serif",
+                            weight="bold",
+                        ),
+                        line=dict(
+                            shape="spline",
+                            smoothing=1.3,
+                            width=4,
+                            color="#D90429",
+                        ),
+                        marker=dict(size=8, color="#D90429"),
+                    )
+                )
+
+            rango_str = (
+                f"DESDE EL AÑO {min(anios_mes_sel)} HASTA EL AÑO {max(anios_mes_sel)}"
+                if len(anios_mes_sel) > 1
+                else f"AÑO {min(anios_mes_sel)}"
+                if anios_mes_sel
+                else "SELECCIONADOS"
+            )
+
+            fig_mes.update_layout(
+                title=f"COMPARATIVO DE {titulo_evento.upper()} MENSUALIZADOS {rango_str}",
+                xaxis_title="Mes",
+                yaxis_title="Casos",
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=360,
+                margin=dict(l=10, r=10, t=40, b=10),
+                barmode="group",
+                legend=dict(
+                    orientation="v", yanchor="top", y=1, xanchor="left", x=1.02
+                ),
+            )
+            st.plotly_chart(
+                fig_mes, use_container_width=True, config=config_plotly
+            )
+
+    st.divider()
+
+    # FILA 2: Evolución Anual & Grupos Etarios / Comparativo (Derecha)
+    col_hist, col_right = st.columns([1.8, 1])
+
+    with col_hist:
+        st.subheader("📉 Evolución Anual vs. Promedios Históricos")
+
+        df_totales_anuales = (
+            df.groupby("año", as_index=False)["casos_totales"]
+            .sum()
+            .sort_values("año")
+        )
+
+        if not df_totales_anuales.empty:
+            anio_min_total = int(df_totales_anuales["año"].min())
+            anio_max_total = int(df_totales_anuales["año"].max())
+            anios_totales_ord = sorted(df_totales_anuales["año"].unique())
+
+            posiciones_texto = []
+            cant_puntos = len(df_totales_anuales)
+
+            for idx in range(cant_puntos):
+                if idx == 0:
+                    posiciones_texto.append("top right")
+                elif idx == cant_puntos - 1:
+                    posiciones_texto.append("top left")
+                else:
+                    posiciones_texto.append("top center")
+
+            promedio_total = df_totales_anuales["casos_totales"].mean()
+
+            ultimos_10 = anios_totales_ord[-10:]
+            df_10 = df_totales_anuales[
+                df_totales_anuales["año"].isin(ultimos_10)
+            ]
+            promedio_10_anios = df_10["casos_totales"].mean()
+            anio_inicio_10 = int(min(ultimos_10))
+
+            ultimos_5 = anios_totales_ord[-5:]
+            df_5 = df_totales_anuales[df_totales_anuales["año"].isin(ultimos_5)]
+            promedio_5_anios = df_5["casos_totales"].mean()
+            anio_inicio_5 = int(min(ultimos_5))
+
+            fig_hist = go.Figure()
+
+            fig_hist.add_trace(
+                go.Scatter(
+                    x=df_totales_anuales["año"],
+                    y=df_totales_anuales["casos_totales"],
+                    mode="lines+markers+text",
+                    name="Casos Anuales",
+                    text=df_totales_anuales["casos_totales"],
+                    textposition=posiciones_texto,
+                    textfont=dict(size=12, color="#ffffff", weight="bold"),
+                    fill="tozeroy",
+                    fillcolor="rgba(0, 86, 179, 0.25)",
+                    line=dict(
+                        shape="spline",
+                        smoothing=1.3,
+                        width=4,
+                        color="#00CCFF",
+                    ),
+                    marker=dict(
+                        size=9,
+                        color="#FFFFFF",
+                        line=dict(width=3, color="#0056B3"),
+                    ),
+                )
+            )
+
+            fig_hist.add_trace(
+                go.Scatter(
+                    x=[anio_min_total, anio_max_total],
+                    y=[promedio_total, promedio_total],
+                    mode="lines",
+                    name=f"Prom. Histórico Total ({int(promedio_total):,})",
+                    line=dict(color="#00FF66", width=2.5, dash="dash"),
+                )
+            )
+
+            fig_hist.add_trace(
+                go.Scatter(
+                    x=[anio_min_total, anio_max_total],
+                    y=[promedio_10_anios, promedio_10_anios],
+                    mode="lines",
+                    name=f"Prom. Últimos 10 Años ({int(promedio_10_anios):,})",
+                    line=dict(color="#FFEA00", width=3, dash="dot"),
+                )
+            )
+
+            fig_hist.add_trace(
+                go.Scatter(
+                    x=[anio_min_total, anio_max_total],
+                    y=[promedio_5_anios, promedio_5_anios],
+                    mode="lines",
+                    name=f"Prom. Últimos 5 Años ({int(promedio_5_anios):,})",
+                    line=dict(color="#D90429", width=3, dash="solid"),
+                )
+            )
+
+            # --- LÍNEAS VERTICALES DE CORTE CON NUEVOS COLORES Y TEXTOS COMPLETOS ---
+            fig_hist.add_vline(
+                x=anio_inicio_10,
+                line_width=2.5,
+                line_dash="dashdot",
+                line_color="#00E5FF",  # Cian brillante distintivo
+                annotation_text="Inicio Út. 10 Años",
+                annotation_position="top left",
+                annotation_font=dict(color="#00E5FF", size=11, weight="bold"),
+            )
+
+            fig_hist.add_vline(
+                x=anio_inicio_5,
+                line_width=2.5,
+                line_dash="dashdot",
+                line_color="#FF9100",  # Naranja brillante distintivo
+                annotation_text="Inicio Út. 5 Años",
+                annotation_position="top left",
+                annotation_font=dict(color="#FF9100", size=11, weight="bold"),
+            )
+
+            max_valor_y = max(
+                df_totales_anuales["casos_totales"].max(),
+                promedio_total,
+                promedio_10_anios,
+                promedio_5_anios,
+            )
+
+            fig_hist.update_layout(
+                title=f"TENDENCIA ANUAL DE {titulo_evento.upper()} VS. PROMEDIOS HISTÓRICOS",
+                xaxis_title="Año",
+                yaxis_title="Casos Totales",
+                template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 height=380,
-                margin=dict(l=10, r=10, t=50, b=10),
-                legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02)
+                margin=dict(l=20, r=20, t=50, b=10),
+                yaxis=dict(
+                    range=[0, max_valor_y * 1.30],
+                    showgrid=False,
+                    zeroline=True,
+                    zerolinecolor="rgba(255,255,255,0.2)",
+                ),
+                xaxis=dict(
+                    range=[anio_min_total - 0.5, anio_max_total + 0.5],
+                    dtick=1,
+                    tickformat="d",
+                    showgrid=False,
+                ),
+                legend=dict(
+                    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                ),
             )
-            st.plotly_chart(fig_etario, use_container_width=True, config=config_plotly)
-        else:
-            st.info("⚠️ No se encontraron columnas de grupos etarios o datos disponibles para IRAS.")
-            
-    elif key_prefix == "edas":
-        st.subheader("👥 Casos de EDAS por Grupos Etarios (Apilado)")
-        
-        # Columnas etarias horizontales presentes en tu archivo consolidado de EDAS
-        columnas_etarias_edas = [
-            "DAA_C1", "DAA_C1_4", "DAA_C5", "DAA_C5_11", 
-            "DAA_C12_17", "DAA_C18_29", "DAA_C30_59", "DAA_C60"
-        ]
-        cols_presentes = [col for col in columnas_etarias_edas if col in df.columns]
-        
-        if not df.empty and cols_presentes:
-            anios_edas_etario = st.multiselect(
-                "Seleccionar Año(s) - Etarios:",
+            st.plotly_chart(
+                fig_hist, use_container_width=True, config=config_plotly
+            )
+
+    with col_right:
+        if key_prefix == "febriles":
+            st.subheader("📈 Comparativo Últimas Semanas")
+
+            anios_g2 = st.multiselect(
+                "Seleccionar Año(s) - Últimas Semanas:",
                 anios_disponibles,
                 default=ultimos_dos_anios,
-                key="edas_etarios_anios",
+                key=f"{key_prefix}_g2_anios",
             )
-            
-            df_base_edas = df[df["año"].isin(anios_edas_etario)].copy()
-            
-            if not df_base_edas.empty:
-                # Transformación de formato ancho a formato largo para graficar
-                df_melted = df_base_edas.melt(
-                    id_vars=["año"],
-                    value_vars=cols_presentes,
-                    var_name="grupo_edad",
-                    value_name="casos"
+
+            semanas_disponibles_data = sorted(
+                df_max_anio[df_max_anio["casos_totales"] > 0]["semana"].unique()
+            )
+            if len(semanas_disponibles_data) >= 2:
+                semanas_ultimas = [
+                    semanas_disponibles_data[-2],
+                    semanas_disponibles_data[-1],
+                ]
+            elif len(semanas_disponibles_data) == 1:
+                semanas_ultimas = [semanas_disponibles_data[0]]
+            else:
+                semanas_ultimas = [semana_epidemiologica_actual]
+
+            df_comp_data = df[
+                (df["año"].isin(anios_g2))
+                & (df["semana"].isin(semanas_ultimas))
+            ].copy()
+            df_comp_data["año_str"] = df_comp_data["año"].astype(str)
+
+            if not df_comp_data.empty:
+                df_comp = (
+                    df_comp_data.groupby(["semana", "año_str"])[
+                        "casos_totales"
+                    ]
+                    .sum()
+                    .reset_index()
                 )
-                
-                df_agrupado_edas = df_melted.groupby(["año", "grupo_edad"], as_index=False)["casos"].sum()
-                df_agrupado_edas["año_str"] = df_agrupado_edas["año"].astype(str)
-                
-                # Nombres amigables para las etiquetas del eje X
-                nombres_bonitos = {
-                    "DAA_C1": "< 1 Año",
-                    "DAA_C1_4": "1-4 Años",
-                    "DAA_C5": "5 Años",
-                    "DAA_C5_11": "5-11 Años",
-                    "DAA_C12_17": "12-17 Años",
-                    "DAA_C18_29": "18-29 Años",
-                    "DAA_C30_59": "30-59 Años",
-                    "DAA_C60": "60 a +"
-                }
-                df_agrupado_edas["grupo_edad_etiqueta"] = df_agrupado_edas["grupo_edad"].map(nombres_bonitos).fillna(df_agrupado_edas["grupo_edad"])
-                
-                fig_edas_etario = px.bar(
-                    df_agrupado_edas,
-                    x="año_str",
-                    y="casos",
-                    color="grupo_edad_etiqueta",
-                    barmode="stack",  # Gráfico apilado igual que IRAS
+                fig_ult = px.bar(
+                    df_comp,
+                    x="semana",
+                    y="casos_totales",
+                    color="año_str",
+                    barmode="group",
+                    text="casos_totales",
                     template="plotly_dark",
-                    title="DISTRIBUCIÓN APILADA DE EDAS POR EDAD",
+                    title=f"Semanas {' y '.join(map(str, semanas_ultimas))}",
                     labels={
+                        "semana": "N° de Semana",
+                        "casos_totales": "Casos",
                         "año_str": "Año",
-                        "casos": "Casos Totales",
-                        "grupo_edad_etiqueta": "Grupo Etario"
                     },
+                    color_discrete_sequence=["#0056B3", "#D90429"],
                 )
-                fig_edas_etario.update_layout(
+                fig_ult.update_traces(textfont_size=13, textposition="auto")
+                fig_ult.update_xaxes(type="category")
+                fig_ult.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
                     height=380,
                     margin=dict(l=10, r=10, t=50, b=10),
-                    legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02)
                 )
-                st.plotly_chart(fig_edas_etario, use_container_width=True, config=config_plotly)
-            else:
-                st.info("⚠️ No hay datos para los años seleccionados en EDAS.")
+                st.plotly_chart(
+                    fig_ult, use_container_width=True, config=config_plotly
+                )
+
         else:
-            st.info("⚠️ No se encontraron las columnas etarias de EDAS en el archivo consolidado.")
+            renderizar_grafico_grupos_etarios(df, key_prefix)
+
+
+# 7. EJECUCIÓN DEL MÓDULO SELECCIONADO
+if modulo_seleccionado == "🌡️ Febriles":
+    df = cargar_datos_csv("febriles_consolidado.csv", col_total_casos="feb_tot")
+    if df is None:
+        st.error("⚠️ No se encontró el archivo `febriles_consolidado.csv`.")
     else:
-        # Comportamiento por defecto para otros módulos
-        st.subheader("👥 Distribución por Grupos Etarios")
-        if not df.empty and "grupo_edad" in df.columns:
-            df_etario_def = df.groupby("grupo_edad")["casos_totales"].sum().reset_index()
-            fig_etario_def = px.pie(
-                df_etario_def,
-                names="grupo_edad",
-                values="casos_totales",
-                template="plotly_dark",
-                title=f"PROPORCIÓN POR GRUPO ETARIO - {titulo_evento.upper()}"
-            )
-            fig_etario_def.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                height=380,
-                margin=dict(l=10, r=10, t=50, b=10)
-            )
-            st.plotly_chart(fig_etario_def, use_container_width=True, config=config_plotly)
-        else:
-            st.warning("No hay datos disponibles para grupos etarios en este evento.")
+        renderizar_dashboard(
+            df, titulo_evento="Febriles", key_prefix="febriles"
+        )
+
+elif modulo_seleccionado == "🫁 IRAS":
+    df = cargar_datos_csv("iras_consolidado.csv")
+    if df is None and os.path.exists("iras.csv"):
+        df = cargar_datos_csv("iras.csv")
+
+    if df is None:
+        st.warning(
+            "⚠️ Aún no se detecta el archivo `iras_consolidado.csv` o `iras.csv` en el repositorio."
+        )
+    else:
+        renderizar_dashboard(df, titulo_evento="IRAS", key_prefix="iras")
+
+else:
+    st.title("🚧 Módulo en Desarrollo")
+    st.info(
+        f"El módulo de **{modulo_seleccionado}** estará disponible en las próximas iteraciones."
+    )
