@@ -185,7 +185,7 @@ with col_right:
 
     st.markdown("---")
 
-    # --- BLOQUE DINÁMICO POR MÓDULO (IRAS, EDAS, OTROS) ---
+    # --- BLOQUE DINÁMICO: MÓDULO IRIS / EDAS / OTROS ---
     if key_prefix == "iras":
         st.subheader("👥 Casos por Grupos Etarios (Apilado)")
         
@@ -234,7 +234,7 @@ with col_right:
     elif key_prefix == "edas":
         st.subheader("👥 Casos de EDAS por Grupos Etarios (Apilado)")
         
-        # Columnas etarias horizontales presentes en el consolidado de EDAS
+        # Columnas etarias horizontales presentes en tu archivo consolidado de EDAS
         columnas_etarias_edas = [
             "DAA_C1", "DAA_C1_4", "DAA_C5", "DAA_C5_11", 
             "DAA_C12_17", "DAA_C18_29", "DAA_C30_59", "DAA_C60"
@@ -263,7 +263,7 @@ with col_right:
                 df_agrupado_edas = df_melted.groupby(["año", "grupo_edad"], as_index=False)["casos"].sum()
                 df_agrupado_edas["año_str"] = df_agrupado_edas["año"].astype(str)
                 
-                # Mapeo de nombres limpios y profesionales
+                # Nombres amigables para las etiquetas del eje X
                 nombres_bonitos = {
                     "DAA_C1": "< 1 Año",
                     "DAA_C1_4": "1-4 Años",
@@ -274,21 +274,10 @@ with col_right:
                     "DAA_C30_59": "30-59 Años",
                     "DAA_C60": "60 a +"
                 }
-                df_agrupado_edas["grupo_edad_etiqueta"] = df_agrupado_edas["grupo_edad"].map(nombres_bonitos)
-                
-                # Orden cronológico estricto
-                orden_cronologico = [
-                    "< 1 Año", "1-4 Años", "5 Años", "5-11 Años", 
-                    "12-17 Años", "18-29 Años", "30-59 Años", "60 a +"
-                ]
-                df_agrupado_edas["grupo_edad_etiqueta"] = pd.Categorical(
-                    df_agrupado_edas["grupo_edad_etiqueta"], 
-                    categories=orden_cronologico, 
-                    ordered=True
-                )
+                df_agrupado_edas["grupo_edad_etiqueta"] = df_agrupado_edas["grupo_edad"].map(nombres_bonitos).fillna(df_agrupado_edas["grupo_edad"])
                 
                 fig_edas_etario = px.bar(
-                    df_agrupado_edas.sort_values("grupo_edad_etiqueta"),
+                    df_agrupado_edas,
                     x="año_str",
                     y="casos",
                     color="grupo_edad_etiqueta",
